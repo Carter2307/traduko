@@ -1,0 +1,36 @@
+0.25 enter
+0.95 mood happy
+1.9 pointer 3 -1
+2.3 pointer none
+2.7 drag -7 -2
+3.15 drop
+3.2 attention 1 0.25
+3.68 nudge
+4.73 nudge
+5.73 nudge
+5.95 attention none
+6.0 drag 9 4
+6.45 drop
+6.6 pointer -2.5 -1.2
+6.75 pointer -1.2 -0.6
+6.9 pointer -0.2 -0.1
+7.0 press
+7.12 release
+7.2 pointer none
+7.25 attention -1 -0.7
+7.75 mood thinking
+9.9 mood happy
+11.2 attention none
+11.25 drag -8 -4
+11.7 drop
+11.75 mood thinking
+12.1 color e8408a
+12.15 mood idle
+12.5 color 7b52ee
+12.55 mood happy
+12.9 color 2b7bf0
+12.95 mood thinking
+13.25 color 0b959b
+13.3 mood idle
+13.65 color f45a1c
+14.0 mood happy
