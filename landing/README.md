@@ -2,7 +2,7 @@
 
 A React + TypeScript landing page built with Vite and Tailwind CSS. The page introduces Traduko's floating desktop companion and its local translation features.
 
-The header contains only the Traduko brand and an inert download button at every screen size. The hero headline is “Translate anytime with a little companion.”
+The header contains only the Traduko brand and a download link at every screen size. The hero headline is “Translate anytime with a little companion.”
 
 ## Development
 
@@ -19,6 +19,7 @@ Vite prints the local preview URL. To check and build the page:
 
 ```sh
 npm run lint
+npm test
 npm run build
 npm run preview
 ```
@@ -27,7 +28,7 @@ npm run preview
 
 ## Worktree
 
-This page is developed on the `codex/traduko-landing` branch in a separate Git worktree.
+This page is developed in a separate Git worktree.
 
 The original macOS application is under `crates/app`; the website is contained in `landing`.
 
@@ -57,7 +58,11 @@ The native first run contains Welcome and Models, followed by Login only when pe
 
 ## Download and product copy
 
-Every **Download for Mac** button is intentionally inert. There is no attached binary, download navigation, checkout, or release endpoint. The page does not claim App Store availability or a published release.
+Every **Download for Mac** link downloads a ZIP from the published [Traduko 0.2.0 release](https://github.com/Carter2307/traduko/releases/tag/v0.2.0). All three links share one architecture check: on macOS, explicit `x86` / `64` [User-Agent Client Hints](https://developer.chrome.com/docs/privacy-security/user-agent-client-hints) select the Intel build. Apple silicon, absent or blocked hints, non-Mac visitors, unknown values, and detection taking longer than one second use the Apple silicon build.
+
+The ordinary user-agent string and `navigator.platform` are not architecture evidence: Safari and Firefox can report “Intel Mac” on Apple silicon. Browsers without architecture hints, including Safari and Firefox, therefore use the requested Apple silicon fallback. Detection remains local and sends no device hints to a server. An ordinary click waits for detection if it is still pending; each link also has a usable href and preserves native modified-click behavior. Update both URLs in `src/lib/mac-download.ts` when publishing a later version.
+
+`npm test` runs the download-selection regression cases with Node's built-in test runner; no additional test dependency is needed. There is no App Store badge.
 
 Translation runs locally after the initial model downloads. French and English are the starting languages, with additional language models available from the app. American and British English are selectable. Product copy is based on the native application's README and implementation.
 
@@ -73,4 +78,4 @@ The hero's interactive mascot reuses the native app's speech-bubble outline and 
 
 The hero, closing card, and footer share a real WebGPU pipeline and a procedural WGSL fragment shader for soft, dappled shapes in Traduko's primary orange (`#F45A1C`), warm peach, and cream highlights. The shapes flow downward from the top with organic side-to-side sway, while pointer movement adds a small, smoothed parallax. The footer mirrors the canvas vertically so its shapes rise from the bottom and applies a linear CSS mask to fade progressively upward; it leaves extra space below the footer links. Rendering is capped at 30 frames per second and a device pixel ratio of 1.5; each instance pauses when it leaves the viewport or the document is hidden. Reduced motion renders a still frame. Unsupported browsers and GPU failures use a static CSS wash in the same warm palette.
 
-The shader wrapper exposes `data-renderer`, `data-motion`, and a short `data-error` reason for development inspection. The renderer was verified as `webgpu` in the local preview. The page uses no tracking or third-party runtime requests.
+The shader wrapper exposes `data-renderer`, `data-motion`, and a short `data-error` reason for development inspection. The renderer was verified as `webgpu` in the local preview. The shader itself uses no third-party runtime requests.
