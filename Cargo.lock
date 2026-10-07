@@ -7344,6 +7344,7 @@ name = "traduko"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "block2 0.6.2",
  "futures",
  "gpui-component",
  "gpui-kit-assets",

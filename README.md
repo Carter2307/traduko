@@ -12,6 +12,8 @@ Translation runs on this Mac, with no network.
 - **American or British English** for the English side.
 - **Two models** for French and English: a light one and a more accurate one.
 - **Comes back after a restart**: Traduko opens at login, once you allow it.
+- **Remembers what it translated**: each translation is kept in a file on
+  this Mac, to look at later.
 
 ## Install
 
@@ -57,7 +59,7 @@ Light / Accurate menu removes it; the entry is there when there is something
 to remove, and says how much. **Download models…** brings it back. The
 languages you added are never removed: each has one model per direction.
 
-To remove everything (dry run first, then `--yes`):
+To remove everything, the history included (dry run first, then `--yes`):
 
 ```bash
 scripts/uninstall.sh
@@ -76,7 +78,35 @@ scripts/uninstall.sh
 | American / British | Choose the English you want, when translating to English |
 | Light / Accurate | Choose the model, Traduko's size (small, medium, large) and its colour (orange, pink, violet, blue, teal), download the other model or delete it, open at login, quit |
 | ⌘⇧C, or Copy | Copy the translation |
-| Esc, or × | Close the panel |
+| Esc, the × at the top right, or a click anywhere outside the panel | Close the panel |
+
+### History
+
+Traduko keeps what it translated: one line of JSON for each translation, in
+`~/Library/Application Support/Traduko/history.jsonl`. The file stays on this
+Mac, and only your account can read it.
+
+```json
+{"at":1791370000,"from":"fr","to":"en","detected":true,"british":false,"accurate":true,"source":"Bonjour","translation":"Hello.","ms":212,"copied":false}
+```
+
+| Field | What it holds |
+|---|---|
+| `at` | When the translation was finished, in seconds since 1970 |
+| `from`, `to` | The languages, as their codes |
+| `detected` | Traduko told the language of the text itself |
+| `british`, `accurate` | The English and the model that were asked for, as in `settings.json` |
+| `source`, `translation` | What you typed, and what Traduko made of it |
+| `ms` | How long the translation took, in milliseconds |
+| `copied` | You copied the translation |
+
+Traduko translates while you type, so a text goes through many translations
+before it is whole, and not all of them are kept. One is kept when it has
+stayed on screen for a second and a half, or at once when you copy it, close
+the panel or quit. A text that you go on typing keeps one line, with its
+latest translation.
+
+Nothing reads the file yet and nothing trims it. Delete it to start again.
 
 ## How it is made
 
@@ -119,10 +149,12 @@ cargo run --release -p traduko-blob --example icon -- assets/icon-1024.png
 
 Ways to drive the app without the mouse, for captures:
 `TRADUKO_DEMO=1` plays every mood, `TRADUKO_PANEL=1` opens the panel without
-taking the keyboard, `TRADUKO_TEXT="..."` types into it,
+taking the keyboard (and a click elsewhere leaves it open),
+`TRADUKO_TEXT="..."` types into it,
 `TRADUKO_APPEARANCE=light|dark` forces a theme, `TRADUKO_CLICK="x,y"` clicks a
 point of the panel inside the app, `TRADUKO_FPS=1` prints the mascot's frame
-rate, `TRADUKO_SUPPORT_DIR=<folder>` keeps the run away from the real settings,
+rate, `TRADUKO_SUPPORT_DIR=<folder>` keeps the run away from the real settings
+and history,
 `TRADUKO_QUIT_AFTER=<seconds>` ends the run.
 
 The first screens come back with settings that never saw them: an empty

@@ -60,7 +60,7 @@ for dir in "${APPS_DIRS[@]}"; do
 done
 
 echo "4. Its data"
-remove "$HOME_DIR/Library/Application Support/$APP_NAME"            # models, settings, instance.lock
+remove "$HOME_DIR/Library/Application Support/$APP_NAME"            # models, settings, history, instance.lock
 remove "$HOME_DIR/Library/Caches/$BUNDLE_ID"
 remove "$HOME_DIR/Library/HTTPStorages/$BUNDLE_ID"
 remove "$HOME_DIR/Library/Preferences/$BUNDLE_ID.plist"

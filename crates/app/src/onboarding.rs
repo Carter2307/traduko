@@ -656,23 +656,7 @@ impl Render for Onboarding {
         let several = self.steps.len() > 1;
 
         // ---- header: grip, name, where we are, close ----------------------------
-        // On the shell, where a chip would not show: the colour of a card.
-        let close_hover = p.chip_hover;
-        let close = div()
-            .id("close")
-            .flex()
-            .items_center()
-            .justify_center()
-            .size(px(28.))
-            .rounded_full()
-            .bg(p.card)
-            .text_color(p.ink)
-            .cursor_pointer()
-            .hover(move |style| style.bg(close_hover))
-            // A press here is not a grab of the header.
-            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-            .on_click(cx.listener(|_, _, _, cx| cx.emit(OnboardingEvent::Dismissed)))
-            .child(Icon::new(IconName::X).size(px(14.)));
+        let close = theme::close(&p).on_click(cx.listener(|_, _, _, cx| cx.emit(OnboardingEvent::Dismissed)));
         let header = div()
             .id("header")
             .flex()

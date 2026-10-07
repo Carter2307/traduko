@@ -23,6 +23,8 @@ gpui-kit-assets = "=0.7.1"
 futures = "0.3"
 raw-window-handle = "0.6"
 objc2 = "0.6"
+# The handler that AppKit calls for a click in another app.
+block2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-foundation = "0.3"
 # The language recognizer of macOS: it tells which language a text is in.
