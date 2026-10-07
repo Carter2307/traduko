@@ -224,7 +224,7 @@ impl Traduko {
     }
 
     pub fn hide_panel(&mut self, cx: &mut Context<Self>) {
-        let Some(panel) = self.panel.as_mut() else { return };
+        let Some(panel) = self.panel.as_mut().filter(|panel| panel.visible) else { return };
         panel.visible = false;
         panel.clicks_elsewhere = None;
         let window = panel.native.clone();
