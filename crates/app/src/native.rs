@@ -1,13 +1,17 @@
 //! Raw AppKit calls for what gpui does not expose: window level, Spaces,
-//! shadow, moving and hiding a window.
+//! shadow, moving and hiding a window, the clicks that go to other apps.
 //!
 //! gpui hands out its NSView through `raw-window-handle`; the NSWindow is
 //! that view's window. Everything here runs on the main thread, which is
 //! where gpui runs every window callback.
 
+use std::ptr::NonNull;
+
+use block2::RcBlock;
 use objc2::rc::Retained;
+use objc2::runtime::AnyObject;
 use objc2::{MainThreadMarker, msg_send};
-use objc2_app_kit::{NSScreen, NSView, NSWindow, NSWindowCollectionBehavior};
+use objc2_app_kit::{NSEvent, NSEventMask, NSScreen, NSView, NSWindow, NSWindowCollectionBehavior};
 use objc2_foundation::{NSPoint, NSRect};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
@@ -74,6 +78,29 @@ pub fn show(win: &NSWindow) {
 
 pub fn hide(win: &NSWindow) {
     win.orderOut(None);
+}
+
+/// Tells of every press of a mouse button that goes to another app, for as
+/// long as it lives: the desktop, another window, the menu bar. A press in
+/// one of Traduko's own windows is not one of them. macOS asks no
+/// permission for this, which reports that a button went down and nothing
+/// of what was under it.
+pub struct ClicksElsewhere(Retained<AnyObject>);
+
+impl ClicksElsewhere {
+    /// `seen` runs on the main thread, outside of any gpui update.
+    pub fn watch(seen: impl Fn() + 'static) -> Option<Self> {
+        let buttons = NSEventMask::LeftMouseDown | NSEventMask::RightMouseDown | NSEventMask::OtherMouseDown;
+        let handler = RcBlock::new(move |_: NonNull<NSEvent>| seen());
+        NSEvent::addGlobalMonitorForEventsMatchingMask_handler(buttons, &handler).map(Self)
+    }
+}
+
+impl Drop for ClicksElsewhere {
+    fn drop(&mut self) {
+        // SAFETY: the monitor that AppKit gave to `watch`, removed once.
+        unsafe { NSEvent::removeMonitor(&self.0) };
+    }
 }
 
 /// A rectangle in AppKit screen coordinates: origin at the bottom-left

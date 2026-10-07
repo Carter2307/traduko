@@ -4,10 +4,11 @@
 use std::borrow::Cow;
 
 use gpui::{
-    App, BoxShadow, Div, ElementId, FontWeight, Global, Hsla, SharedString, Stateful, WindowAppearance, div, point,
-    prelude::*, px, rgb, rgba,
+    App, BoxShadow, Div, ElementId, FontWeight, Global, Hsla, MouseButton, SharedString, Stateful, WindowAppearance,
+    div, point, prelude::*, px, rgb, rgba,
 };
-use gpui_component::{Theme, ThemeMode};
+use gpui_component::{Icon, Theme, ThemeMode};
+use gpui_kit_assets::IconName;
 
 use crate::settings::Accent;
 
@@ -143,6 +144,26 @@ pub fn chip(id: impl Into<ElementId>, p: &Palette) -> Stateful<Div> {
 /// moved by its header.
 pub fn grip(p: &Palette) -> Div {
     div().flex().gap(px(3.)).children((0..4).map(|_| div().w(px(3.)).h(px(9.)).rounded(px(1.)).bg(p.muted.opacity(0.7))))
+}
+
+/// The cross at the right of a header, which closes its window. On the
+/// shell, where a chip would not show: the colour of a card.
+pub fn close(p: &Palette) -> Stateful<Div> {
+    let hover = p.chip_hover;
+    div()
+        .id("close")
+        .flex()
+        .items_center()
+        .justify_center()
+        .size(px(28.))
+        .rounded_full()
+        .bg(p.card)
+        .text_color(p.ink)
+        .cursor_pointer()
+        .hover(move |style| style.bg(hover))
+        // A press here is not a grab of the header.
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .child(Icon::new(IconName::X).size(px(14.)))
 }
 
 /// The shadow of a shell. Kept short of `SHELL_MARGIN`, or it ends on a

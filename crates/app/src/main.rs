@@ -1,5 +1,6 @@
 mod app;
 mod detect;
+mod history;
 mod login;
 mod mascot_view;
 mod native;
