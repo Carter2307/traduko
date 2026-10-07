@@ -270,6 +270,7 @@ impl Traduko {
             },
             |window, cx| {
                 native::float(window, Floating::Panel);
+                native::glass(window, SHELL_MARGIN as f64, crate::theme::SHELL_RADIUS as f64);
                 let onboarding = cx.new(|cx| Onboarding::new(options, cx));
                 view = Some(onboarding.clone());
                 cx.new(|cx| Root::new(onboarding, window, cx).bg(gpui::transparent_black()))
@@ -402,6 +403,7 @@ impl Traduko {
             },
             |window, cx| {
                 native::float(window, Floating::Panel);
+                native::glass(window, panel::MARGIN as f64, crate::theme::SHELL_RADIUS as f64);
                 let panel = cx.new(|cx| Panel::new(translator, options, window, cx));
                 view = Some(panel.clone());
                 cx.new(|cx| Root::new(panel, window, cx).bg(gpui::transparent_black()))
@@ -569,7 +571,7 @@ fn place_panel(mascot: Rect, area: Rect, width: f64, height: f64, margin: f64) -
         mascot.y + mascot.h - inset + margin - height
     };
 
-    // The shell must stay on screen; its shadow margin may hang over the edge.
+    // The shell must stay on screen; its transparent margin may hang over the edge.
     let shell_area = Rect { x: area.x - margin + 8.0, y: area.y - margin + 8.0, w: area.w + 2.0 * margin - 16.0, h: area.h + 2.0 * margin - 16.0 };
     let window = Rect { x, y, w: width, h: height }.kept_inside(&shell_area);
     (window, if go_left { -1.0 } else { 1.0 })

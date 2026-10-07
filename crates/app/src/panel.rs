@@ -50,10 +50,10 @@ actions!(
 
 pub const KEY_CONTEXT: &str = "TradukoPanel";
 
-/// The shell, without the transparent margin that holds its shadow.
+/// The shell, without the transparent margin around it.
 pub const SHELL_WIDTH: f32 = 404.0;
 pub const SHELL_HEIGHT: f32 = 548.0;
-/// Transparent room around the shell for the shadow.
+/// Transparent room around the shell.
 pub const MARGIN: f32 = theme::SHELL_MARGIN;
 
 const DEBOUNCE: Duration = Duration::from_millis(350);
@@ -889,11 +889,9 @@ impl Render for Panel {
             .flex()
             .flex_col()
             .p(px(SHELL_PAD))
-            .bg(p.shell)
             .rounded(px(SHELL_RADIUS))
             .font_family(theme::SANS)
             .text_color(p.ink)
-            .shadow(theme::shell_shadow(&p))
             .child(header)
             .child(line)
             .child(div().flex().flex_col().gap(px(8.)).child(source).child(result).child(footer));
