@@ -1,10 +1,10 @@
 //! Rewrites the weights of a Marian model at half the size.
 //!
-//!     cargo run --release -p coco-engine --example to-f16 -- IN OUT
+//!     cargo run --release -p traduko-engine --example to-f16 -- IN OUT
 //!
 //! `IN` is a `model.safetensors` in 32-bit floats as the Hub has it for the
 //! small opus-mt models; `OUT` holds the same tensors in 16-bit floats, the
-//! form the engine computes in. The work is `coco_engine::to_f16`, which the
+//! form the engine computes in. The work is `traduko_engine::to_f16`, which the
 //! app uses too when it downloads the small models itself.
 
 use std::path::Path;
@@ -17,7 +17,7 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     };
     let (input, output) = (Path::new(input), Path::new(output));
-    match coco_engine::to_f16(input, output) {
+    match traduko_engine::to_f16(input, output) {
         Ok(tensors) => {
             let megabytes = |path: &Path| std::fs::metadata(path).map_or(0.0, |file| file.len() as f64 / 1e6);
             println!(

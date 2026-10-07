@@ -1,13 +1,13 @@
-//! Opening Coco at login. macOS holds the state; this keeps it in step with
+//! Opening Traduko at login. macOS holds the state; this keeps it in step with
 //! what the user asked for. Every call here talks to a system service and
 //! takes tens of milliseconds, so it runs off the main thread.
 
-use coco_login::launch_agent::LaunchAgent;
-use coco_login::{LoginItem, LoginStatus, StartupAction, bundle, startup_action};
+use traduko_login::launch_agent::LaunchAgent;
+use traduko_login::{LoginItem, LoginStatus, StartupAction, bundle, startup_action};
 
 use crate::settings::{BUNDLE_ID, Settings};
 
-const AGENT_LABEL: &str = "com.github.carter2307.coco.login";
+const AGENT_LABEL: &str = "com.github.carter2307.traduko.login";
 
 fn item() -> Option<LoginItem> {
     let exe = bundle::current_exe().ok()?;
@@ -19,9 +19,9 @@ fn item() -> Option<LoginItem> {
 /// Where the login item stands, for the screen that asks for it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Permission {
-    /// Nothing is registered: Coco has to ask.
+    /// Nothing is registered: Traduko has to ask.
     NotAsked,
-    /// Coco opens at login.
+    /// Traduko opens at login.
     Allowed,
     /// Registered, but switched off in System Settings, where only the
     /// user can switch it back on.
@@ -38,11 +38,11 @@ impl Permission {
     }
 }
 
-/// What macOS says now. `COCO_LOGIN_ITEM=ask|allowed|approval` answers in
+/// What macOS says now. `TRADUKO_LOGIN_ITEM=ask|allowed|approval` answers in
 /// its place, to capture each state of the onboarding from a development
 /// build.
 pub fn permission() -> Permission {
-    match std::env::var("COCO_LOGIN_ITEM").as_deref() {
+    match std::env::var("TRADUKO_LOGIN_ITEM").as_deref() {
         Ok("ask") => return Permission::NotAsked,
         Ok("allowed") => return Permission::Allowed,
         Ok("approval") => return Permission::NeedsApproval,
@@ -115,7 +115,7 @@ pub fn set(on: bool) -> Outcome {
         // that copy can. The wish is recorded and the note says so.
         return Outcome {
             open_at_login: Some(false),
-            note: Some("this is not the installed copy: turn it off from Coco in Applications".into()),
+            note: Some("this is not the installed copy: turn it off from Traduko in Applications".into()),
             ..Outcome::default()
         };
     }
@@ -143,14 +143,14 @@ fn register(item: &LoginItem, current: String) -> Outcome {
         Ok(LoginStatus::Enabled(_)) => Outcome { registered_install: Some(Some(current)), ..Outcome::default() },
         Ok(LoginStatus::RequiresApproval(_)) => {
             LoginItem::open_system_settings();
-            Outcome { note: Some("allow Coco in System Settings, Login Items".into()), ..Outcome::default() }
+            Outcome { note: Some("allow Traduko in System Settings, Login Items".into()), ..Outcome::default() }
         }
         Ok(LoginStatus::Disabled) => Outcome { note: Some("macOS accepted the login item but does not list it yet".into()), ..Outcome::default() },
         Err(error) => Outcome { note: Some(error.to_string()), ..Outcome::default() },
     }
 }
 
-/// `coco --login-item status|enable|disable`, for the install scripts.
+/// `traduko --login-item status|enable|disable`, for the install scripts.
 pub fn command_line(argument: &str) -> i32 {
     match argument {
         "status" => {

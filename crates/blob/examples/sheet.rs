@@ -1,9 +1,9 @@
-//! Draws Coco's poses and a filmstrip of its motion into an SVG file, to
+//! Draws Traduko's poses and a filmstrip of its motion into an SVG file, to
 //! look at the animation without opening a window.
 //!
-//!     cargo run -p coco-blob --example sheet -- out.svg
+//!     cargo run -p traduko-blob --example sheet -- out.svg
 
-use coco_blob::{CANVAS, Frame, Mascot, Mood};
+use traduko_blob::{CANVAS, Frame, Mascot, Mood};
 
 const CELL: f32 = 120.0;
 const COLUMNS: usize = 12;

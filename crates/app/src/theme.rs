@@ -1,4 +1,4 @@
-//! Colours, fonts and sizes of Coco's windows, for light and dark, and the
+//! Colours, fonts and sizes of Traduko's windows, for light and dark, and the
 //! pieces both the panel and the onboarding are made of.
 
 use std::borrow::Cow;
@@ -135,9 +135,9 @@ pub fn register_fonts(cx: &mut App) {
 }
 
 /// Follows the system: call at start-up and whenever the appearance changes.
-/// `COCO_APPEARANCE=light|dark` forces one side, to capture both.
+/// `TRADUKO_APPEARANCE=light|dark` forces one side, to capture both.
 pub fn apply(appearance: WindowAppearance, cx: &mut App) {
-    let mode = match std::env::var("COCO_APPEARANCE").as_deref() {
+    let mode = match std::env::var("TRADUKO_APPEARANCE").as_deref() {
         Ok("light") => ThemeMode::Light,
         Ok("dark") => ThemeMode::Dark,
         _ => ThemeMode::from(appearance),

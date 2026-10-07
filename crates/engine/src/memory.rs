@@ -1,6 +1,6 @@
 //! Giving memory back to the system.
 //!
-//! A loaded model is hundreds of megabytes; Coco drops it after ten idle
+//! A loaded model is hundreds of megabytes; Traduko drops it after ten idle
 //! minutes. With the system allocator alone that changes little: macOS keeps
 //! the freed pages in the process, to reuse them or to reclaim them later
 //! (measured on macOS 27: 464 MB before and after dropping the accurate
@@ -14,7 +14,7 @@ use std::alloc::{GlobalAlloc, Layout, System};
 ///
 /// ```ignore
 /// #[global_allocator]
-/// static ALLOCATOR: coco_engine::ReturnsLargeBlocks = coco_engine::ReturnsLargeBlocks;
+/// static ALLOCATOR: traduko_engine::ReturnsLargeBlocks = traduko_engine::ReturnsLargeBlocks;
 /// ```
 pub struct ReturnsLargeBlocks;
 

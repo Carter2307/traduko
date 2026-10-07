@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn the_complete_folders_named_after_a_direction_are_the_models() {
-        let models = std::env::temp_dir().join(format!("coco-store-{}", std::process::id()));
+        let models = std::env::temp_dir().join(format!("traduko-store-{}", std::process::id()));
         assert!(Installed::scan(&models).is_empty());
 
         fill(&folder(&models, hop(Light, "fr-en")), &FILES);

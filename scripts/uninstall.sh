@@ -1,5 +1,5 @@
 #!/bin/bash
-# Removes Coco and everything it left behind.
+# Removes Traduko and everything it left behind.
 #
 #   scripts/uninstall.sh          prints what it would do (dry run, the default)
 #   scripts/uninstall.sh --yes    does it
@@ -9,9 +9,9 @@
 # app's own "disable" command before anything is deleted.
 set -euo pipefail
 
-APP_NAME="${APP_NAME:-Coco}"
-BUNDLE_ID="${BUNDLE_ID:-com.github.carter2307.coco}"
-BIN_NAME="${BIN_NAME:-coco}"
+APP_NAME="${APP_NAME:-Traduko}"
+BUNDLE_ID="${BUNDLE_ID:-com.github.carter2307.traduko}"
+BIN_NAME="${BIN_NAME:-traduko}"
 AGENT_LABEL="${AGENT_LABEL:-$BUNDLE_ID.login}"
 # What the app understands as "turn launch at login off, then exit".
 UNREGISTER_ARGS="${UNREGISTER_ARGS:---login-item disable}"
@@ -27,7 +27,7 @@ run() {
 remove() {
   if [ -e "$1" ]; then run rm -rf "$1"; else echo "  absent: $1"; fi
 }
-# True when the bundle at $1 is this app: another "Coco.app" is left alone.
+# True when the bundle at $1 is this app: another "Traduko.app" is left alone.
 ours() {
   [ "$(plutil -extract CFBundleIdentifier raw -o - "$1/Contents/Info.plist" 2>/dev/null)" = "$BUNDLE_ID" ]
 }
@@ -56,7 +56,7 @@ done
 
 echo "3. The app"
 for dir in "${APPS_DIRS[@]}"; do
-  if ours "$dir/$APP_NAME.app"; then remove "$dir/$APP_NAME.app"; else echo "  not Coco, or absent: $dir/$APP_NAME.app"; fi
+  if ours "$dir/$APP_NAME.app"; then remove "$dir/$APP_NAME.app"; else echo "  not Traduko, or absent: $dir/$APP_NAME.app"; fi
 done
 
 echo "4. Its data"

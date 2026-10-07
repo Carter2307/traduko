@@ -1,6 +1,6 @@
 //! Translates from the command line, through the same API as the app.
 //!
-//!     cargo run --release -p coco-engine --example translate -- \
+//!     cargo run --release -p traduko-engine --example translate -- \
 //!         [--quality light|accurate] [--english american|british] \
 //!         [--dir FROM-TO] [--models DIR] [--linger SECONDS] \
 //!         [--testset FILE | "text"]
@@ -15,16 +15,16 @@
 //! each one took; `--dir` then keeps one of the lists. `--linger` waits
 //! before leaving and
 //! prints the memory of the process before and after: with a short
-//! `COCO_IDLE_SECS`, that shows a model being unloaded.
+//! `TRADUKO_IDLE_SECS`, that shows a model being unloaded.
 
 #[global_allocator]
-static ALLOCATOR: coco_engine::ReturnsLargeBlocks = coco_engine::ReturnsLargeBlocks;
+static ALLOCATOR: traduko_engine::ReturnsLargeBlocks = traduko_engine::ReturnsLargeBlocks;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
-use coco_engine::{Direction, EnglishVariant, Language, Quality, Request, Translator, Update, default_models_dir};
+use traduko_engine::{Direction, EnglishVariant, Language, Quality, Request, Translator, Update, default_models_dir};
 
 struct Options {
     quality: Quality,

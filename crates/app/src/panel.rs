@@ -3,12 +3,10 @@
 //!
 //! Each of the two text cards names its language, and that name is a menu
 //! of the languages that have a model. The top one can also be left to
-//! Coco, which then reads the language off the text.
+//! Traduko, which then reads the language off the text.
 
 use std::time::Duration;
 
-use coco_blob::{Frame, Mascot, Mood};
-use coco_engine::{Direction, EnglishVariant, Installed, Language, Quality, Request, Translator, Update};
 use futures::StreamExt as _;
 use gpui::{
     Animation, AnimationExt as _, App, ClipboardItem, Context, Entity, EventEmitter, FocusHandle, Focusable,
@@ -22,6 +20,8 @@ use gpui_component::{
     menu::{DropdownMenu as _, PopupMenu, PopupMenuItem},
 };
 use gpui_kit_assets::IconName;
+use traduko_blob::{Frame, Mascot, Mood};
+use traduko_engine::{Direction, EnglishVariant, Installed, Language, Quality, Request, Translator, Update};
 
 use crate::detect;
 use crate::mascot_view;
@@ -29,7 +29,7 @@ use crate::settings::MascotSize;
 use crate::theme::{self, MONO, SHELL_PAD, SHELL_RADIUS, card, chip, grip, micro};
 
 actions!(
-    coco,
+    traduko,
     [
         Translate,
         HidePanel,
@@ -42,11 +42,11 @@ actions!(
         MascotLarge,
         ToggleOpenAtLogin,
         ShowModels,
-        QuitCoco
+        QuitTraduko
     ]
 );
 
-pub const KEY_CONTEXT: &str = "CocoPanel";
+pub const KEY_CONTEXT: &str = "TradukoPanel";
 
 /// The shell, without the transparent margin that holds its shadow.
 pub const SHELL_WIDTH: f32 = 404.0;
@@ -93,10 +93,10 @@ pub struct Panel {
     source: Entity<TextareaState>,
     result: Entity<TextareaState>,
     direction: Direction,
-    /// Coco reads the language off the text. Off when the user chose the
+    /// Traduko reads the language off the text. Off when the user chose the
     /// language to translate from.
     detect: bool,
-    /// Set when the user swapped the languages by hand: Coco then stops
+    /// Set when the user swapped the languages by hand: Traduko then stops
     /// choosing the direction itself until the text is cleared.
     direction_pinned: bool,
     english: EnglishVariant,
@@ -179,7 +179,7 @@ impl Panel {
         self.direction
     }
 
-    /// True when Coco reads the language off the text.
+    /// True when Traduko reads the language off the text.
     pub fn detects(&self) -> bool {
         self.detect
     }
@@ -328,7 +328,7 @@ impl Panel {
     }
 
     /// The language to translate from: one that the user picked, or `None`
-    /// to let Coco read it off the text.
+    /// to let Traduko read it off the text.
     fn choose_source(&mut self, language: Option<Language>, window: &mut Window, cx: &mut Context<Self>) {
         self.detect = language.is_none();
         self.direction_pinned = false;
@@ -528,7 +528,7 @@ impl Render for Panel {
                     .items_center()
                     .gap(px(14.))
                     .child(grip(&p))
-                    .child(div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(p.ink).child("Coco")),
+                    .child(div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(p.ink).child("Traduko")),
             )
             .child(
                 div()
@@ -733,7 +733,7 @@ impl Render for Panel {
                     .separator()
                     .menu_with_check("Open at login", open_at_login, Box::new(ToggleOpenAtLogin))
                     .separator()
-                    .menu("Quit Coco", Box::new(QuitCoco))
+                    .menu("Quit Traduko", Box::new(QuitTraduko))
             });
 
         let unit = if words == 1 { "word" } else { "words" };
@@ -795,7 +795,7 @@ impl Render for Panel {
             );
 
         let shell = div()
-            .id("coco-panel")
+            .id("traduko-panel")
             .key_context(KEY_CONTEXT)
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &Translate, window, cx| this.translate_now(window, cx)))
@@ -813,7 +813,7 @@ impl Render for Panel {
                 cx.notify();
             }))
             .on_action(cx.listener(|_, _: &ShowModels, _, cx| cx.emit(PanelEvent::ModelsRequested)))
-            .on_action(cx.listener(|_, _: &QuitCoco, _, cx| cx.emit(PanelEvent::QuitRequested)))
+            .on_action(cx.listener(|_, _: &QuitTraduko, _, cx| cx.emit(PanelEvent::QuitRequested)))
             .w(px(SHELL_WIDTH))
             .h(px(SHELL_HEIGHT))
             .flex()

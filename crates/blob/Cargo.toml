@@ -1,6 +1,6 @@
 [package]
-name = "coco-blob"
-description = "Coco's body and eyes: shapes, springs and motion, with no UI dependency"
+name = "traduko-blob"
+description = "Traduko's body and eyes: shapes, springs and motion, with no UI dependency"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

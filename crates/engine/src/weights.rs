@@ -122,7 +122,7 @@ impl Weights {
 
 // safetensors stores little-endian numbers, and they are read as they are.
 #[cfg(target_endian = "big")]
-compile_error!("coco-engine reads model weights on little-endian targets only");
+compile_error!("traduko-engine reads model weights on little-endian targets only");
 
 #[cfg(test)]
 mod tests {
@@ -146,7 +146,7 @@ mod tests {
     }
 
     fn test_dir(name: &str) -> std::path::PathBuf {
-        std::env::temp_dir().join(format!("coco-weights-{name}-{}", std::process::id()))
+        std::env::temp_dir().join(format!("traduko-weights-{name}-{}", std::process::id()))
     }
 
     #[test]

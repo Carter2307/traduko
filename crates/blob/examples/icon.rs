@@ -1,8 +1,8 @@
-//! Draws the app icon: Coco on a light rounded square, 1024 by 1024.
+//! Draws the app icon: Traduko on a light rounded square, 1024 by 1024.
 //!
-//!     cargo run --release -p coco-blob --example icon -- assets/icon-1024.png
+//!     cargo run --release -p traduko-blob --example icon -- assets/icon-1024.png
 
-use coco_blob::{Mascot, Mood};
+use traduko_blob::{Mascot, Mood};
 
 const SIZE: usize = 1024;
 /// Sub-samples per pixel side, for smooth edges.

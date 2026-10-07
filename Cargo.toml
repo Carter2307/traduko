@@ -15,7 +15,7 @@ codegen-units = 4
 strip = true
 
 # The model is unusable without optimisation, even while developing.
-[profile.dev.package.coco-engine]
+[profile.dev.package.traduko-engine]
 opt-level = 3
 
 [profile.dev.package.candle-core]

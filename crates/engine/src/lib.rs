@@ -106,7 +106,7 @@ const IDLE: Duration = Duration::from_secs(600);
 
 /// Overrides [`IDLE`] with a number of seconds, to watch a model being
 /// unloaded without waiting ten minutes.
-const IDLE_VARIABLE: &str = "COCO_IDLE_SECS";
+const IDLE_VARIABLE: &str = "TRADUKO_IDLE_SECS";
 
 #[derive(Clone)]
 pub struct Translator {
@@ -124,7 +124,7 @@ impl Translator {
         let (jobs, queue) = mpsc::channel();
         // If the thread cannot start, the queue is dropped with the closure
         // and every request fails with a message: see `translate`.
-        let _ = std::thread::Builder::new().name("coco-translator".into()).spawn(move || worker::run(backend, queue, idle));
+        let _ = std::thread::Builder::new().name("traduko-translator".into()).spawn(move || worker::run(backend, queue, idle));
         Self { jobs }
     }
 
@@ -152,9 +152,9 @@ impl Translator {
     }
 }
 
-/// Where the app keeps its models: `$COCO_MODELS_DIR`, or
-/// `~/Library/Application Support/Coco/models`.
+/// Where the app keeps its models: `$TRADUKO_MODELS_DIR`, or
+/// `~/Library/Application Support/Traduko/models`.
 pub fn default_models_dir() -> PathBuf {
-    let from_home = || PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join("Library/Application Support/Coco/models");
-    std::env::var_os("COCO_MODELS_DIR").map_or_else(from_home, PathBuf::from)
+    let from_home = || PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join("Library/Application Support/Traduko/models");
+    std::env::var_os("TRADUKO_MODELS_DIR").map_or_else(from_home, PathBuf::from)
 }

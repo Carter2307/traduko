@@ -12,7 +12,7 @@ use objc2_foundation::{NSPoint, NSRect};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 /// Above normal windows, below the menu bar and menus. gpui's pop-up kind
-/// uses level 101, which would put Coco over every menu.
+/// uses level 101, which would put Traduko over every menu.
 const LEVEL_FLOATING: isize = 3;
 /// One step higher, for the mascot: the panel's transparent shadow margin
 /// overlaps it, and a click there must still reach the mascot.

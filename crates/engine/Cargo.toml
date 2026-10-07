@@ -1,5 +1,5 @@
 [package]
-name = "coco-engine"
+name = "traduko-engine"
 description = "Offline translation with OPUS-MT models: model, sentence pipeline and worker thread"
 version.workspace = true
 edition.workspace = true
@@ -7,7 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-coco-dialect = { path = "../dialect" }
+traduko-dialect = { path = "../dialect" }
 futures-channel = "0.3"
 
 # Tensors and layers only. The Marian model itself lives in this crate, so

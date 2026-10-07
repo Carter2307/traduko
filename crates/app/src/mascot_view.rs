@@ -1,15 +1,15 @@
-//! Coco on the desktop: a small transparent window that only shows the
+//! Traduko on the desktop: a small transparent window that only shows the
 //! mascot. A press and a drag moves it; a press without a drag is a click.
 
 use std::time::{Duration, Instant};
 
-use coco_blob::{CANVAS, Frame, Mascot, Mood};
 use gpui::{
     App, Bounds, Context, DispatchPhase, Entity, EventEmitter, MouseButton, MouseDownEvent, MouseExitEvent,
     MouseMoveEvent, MouseUpEvent, Path, PathBuilder, Pixels, Point, Rgba, Task, Window,
     WindowBackgroundAppearance, WindowBounds, WindowHandle, WindowKind, WindowOptions, canvas, div,
     point, prelude::*, px, size,
 };
+use traduko_blob::{CANVAS, Frame, Mascot, Mood};
 
 use objc2::rc::Retained;
 use objc2_app_kit::NSWindow;
@@ -18,12 +18,12 @@ use crate::native::{self, Floating};
 
 /// Pointer travel that turns a press into a drag, in points.
 const DRAG_THRESHOLD: f32 = 4.0;
-/// How close the pointer must come for Coco to look at it, in mascot units
+/// How close the pointer must come for Traduko to look at it, in mascot units
 /// (about 230 points for the medium size).
 const NOTICE: f32 = 6.0;
 /// How far from the centre a press still lands on the body, in mascot units.
 const BODY: f32 = 1.3;
-/// How often a still Coco checks where the pointer is.
+/// How often a still Traduko checks where the pointer is.
 const WATCH: Duration = Duration::from_millis(110);
 
 pub enum MascotEvent {
@@ -45,13 +45,13 @@ pub struct MascotView {
     /// Side of the square window, in points.
     side: f32,
     last_tick: Instant,
-    /// Frames drawn since the last report, with `COCO_FPS=1`.
+    /// Frames drawn since the last report, with `TRADUKO_FPS=1`.
     frames: Option<(u32, Instant)>,
     press: Option<Press>,
     /// Drag speed in mascot units per second, smoothed.
     velocity: [f32; 2],
     wake: Option<Task<()>>,
-    /// The native window, to know where Coco is on screen.
+    /// The native window, to know where Traduko is on screen.
     window: Option<Retained<NSWindow>>,
     /// The pointer as last given to the mascot.
     seen: Option<[f32; 2]>,
@@ -65,7 +65,7 @@ impl MascotView {
         let mut mascot = Mascot::new(mood);
         mascot.enter();
 
-        // A still Coco draws nothing, so nothing tells it that the pointer
+        // A still Traduko draws nothing, so nothing tells it that the pointer
         // came close: this looks a few times per second and wakes it up.
         let watch = cx.spawn(async move |this, cx| {
             loop {
@@ -85,7 +85,7 @@ impl MascotView {
             mascot,
             side,
             last_tick: Instant::now(),
-            frames: std::env::var_os("COCO_FPS").map(|_| (0, Instant::now())),
+            frames: std::env::var_os("TRADUKO_FPS").map(|_| (0, Instant::now())),
             press: None,
             velocity: [0.0; 2],
             wake: None,
@@ -100,7 +100,7 @@ impl MascotView {
         self.side / (2.0 * CANVAS)
     }
 
-    /// Changes Coco's size. The window grows or shrinks around its centre
+    /// Changes Traduko's size. The window grows or shrinks around its centre
     /// and stays on screen.
     pub fn set_side(&mut self, side: f32, cx: &mut Context<Self>) {
         if side == self.side {
@@ -124,7 +124,7 @@ impl MascotView {
         .detach();
     }
 
-    /// The pointer relative to Coco's centre, in mascot units, when it is
+    /// The pointer relative to Traduko's centre, in mascot units, when it is
     /// close enough to be noticed.
     fn pointer_near(&self) -> Option<[f32; 2]> {
         let frame = native::frame(self.window.as_ref()?);
@@ -147,8 +147,8 @@ impl MascotView {
         cx.notify();
     }
 
-    /// A slow breath while the panel is open and Coco has company. Off
-    /// otherwise, so that an idle Coco costs no drawing at all.
+    /// A slow breath while the panel is open and Traduko has company. Off
+    /// otherwise, so that an idle Traduko costs no drawing at all.
     pub fn set_breathing(&mut self, on: bool, cx: &mut Context<Self>) {
         self.mascot.breathe = on;
         cx.notify();
@@ -220,7 +220,7 @@ impl MascotView {
     }
 
     fn on_down(&mut self, event: &MouseDownEvent, _: &mut Window, cx: &mut Context<Self>) {
-        // The window is a square; Coco is the body in its middle.
+        // The window is a square; Traduko is the body in its middle.
         let (half, scale) = (self.side / 2.0, self.scale());
         let from_centre = ((event.position.x.as_f32() - half) / scale).hypot((event.position.y.as_f32() - half) / scale);
         if from_centre > BODY {

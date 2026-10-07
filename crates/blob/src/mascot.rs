@@ -1,4 +1,4 @@
-//! Coco's motion: what the body and the eyes do over time.
+//! Traduko's motion: what the body and the eyes do over time.
 //!
 //! The UI feeds it events (pointer, press, drag, mood) and calls `step` once
 //! per frame; `frame` then gives the outlines to paint. Nothing here knows
@@ -59,7 +59,7 @@ impl Mood {
     }
 }
 
-/// What to paint: closed outlines in Coco's own units, where the body is
+/// What to paint: closed outlines in Traduko's own units, where the body is
 /// about 2 wide, x grows to the right and y grows downwards.
 #[derive(Clone, Debug, Default)]
 pub struct Frame {
@@ -77,8 +77,8 @@ enum Cue {
 }
 
 pub struct Mascot {
-    /// Seconds since Coco started. Coco runs for days: a 32-bit float would
-    /// stop counting single frames after about three of them.
+    /// Seconds since Traduko started. Traduko runs for days: a 32-bit float
+    /// would stop counting single frames after about three of them.
     clock: f64,
     seed: u32,
     mood: Mood,
@@ -100,7 +100,7 @@ pub struct Mascot {
     bounces: u8,
     /// How much the outline ripples, 0..1; decays by itself.
     jelly: f32,
-    /// Overall size, 0 to 1: Coco grows out of nothing when it appears.
+    /// Overall size, 0 to 1: Traduko grows out of nothing when it appears.
     pop: Spring,
 
     eye_w: Spring,
@@ -119,7 +119,7 @@ pub struct Mascot {
     glance: Option<[f32; 2]>,
     pressed: bool,
     drag: Option<[f32; 2]>,
-    /// Keeps a slow breath going at rest. Off means Coco is perfectly still
+    /// Keeps a slow breath going at rest. Off means Traduko is perfectly still
     /// between two idle gestures, so the window needs no redraw.
     pub breathe: bool,
 
@@ -228,8 +228,8 @@ impl Mascot {
         }
     }
 
-    /// Pointer position in Coco's units (0,0 is the body centre), or `None`
-    /// when it is away. The eyes follow it, and Coco perks up when the
+    /// Pointer position in Traduko's units (0,0 is the body centre), or `None`
+    /// when it is away. The eyes follow it, and Traduko perks up when the
     /// pointer is on its body.
     pub fn set_pointer(&mut self, pointer: Option<[f32; 2]>) {
         self.pointer = pointer;
@@ -315,7 +315,7 @@ impl Mascot {
         self.aim();
 
         // After a rest `dt` is the whole rest: play one frame of it, so that
-        // the gesture that woke Coco starts gently and not three frames in.
+        // the gesture that woke Traduko starts gently and not three frames in.
         let mut left = if dt > 0.05 { 1.0 / 60.0 } else { dt.max(0.0) };
         while left > 0.0 {
             let h = left.min(1.0 / 240.0);

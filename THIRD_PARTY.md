@@ -1,4 +1,4 @@
-# Third-party work in Coco
+# Third-party work in Traduko
 
 | What | From | Licence | Where |
 |---|---|---|---|

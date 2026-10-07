@@ -1,5 +1,5 @@
 #!/bin/bash
-# fetch-models.sh: download the translation models and put them where Coco
+# fetch-models.sh: download the translation models and put them where Traduko
 # reads them.
 #
 #   ./scripts/fetch-models.sh                French and English, both sets (same as --all)
@@ -10,7 +10,7 @@
 #
 # The options add up: --light --lang es fetches the small set and Spanish.
 #
-# Destination: $COCO_MODELS_DIR, or ~/Library/Application Support/Coco/models
+# Destination: $TRADUKO_MODELS_DIR, or ~/Library/Application Support/Traduko/models
 #
 #   <models>/light/fr-en      Helsinki-NLP/opus-mt-fr-en          about 150 MB each
 #   <models>/light/en-fr      Helsinki-NLP/opus-mt-en-fr
@@ -19,7 +19,7 @@
 #   <models>/light/es-en      Helsinki-NLP/opus-mt-es-en          a language of --lang:
 #   <models>/light/en-es      Helsinki-NLP/opus-mt-en-es          about 150 MB each way
 #
-# A language comes as two small models, to English and from it. Coco finds
+# A language comes as two small models, to English and from it. Traduko finds
 # them by their folder, and translates between two languages that have no
 # model of their own (Spanish to German) through English.
 #
@@ -38,7 +38,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-MODELS_DIR="${COCO_MODELS_DIR:-$HOME/Library/Application Support/Coco/models}"
+MODELS_DIR="${TRADUKO_MODELS_DIR:-$HOME/Library/Application Support/Traduko/models}"
 SMALL_FILES="config.json source.spm target.spm vocab.json"
 
 # One line per model: set, direction, repository, commit, then the SHA-256
@@ -190,7 +190,7 @@ install_model() {
     verify "$snapshot" "$downloaded" "$repository model.safetensors"
     if [ "$set_name" = light ]; then
       command -v cargo >/dev/null || { echo "fetch-models: cargo is missing, and the small models need it" >&2; exit 1; }
-      cargo run --release --quiet -p coco-engine --example to-f16 -- "$snapshot" "$weights.part" | sed 's/^/    /'
+      cargo run --release --quiet -p traduko-engine --example to-f16 -- "$snapshot" "$weights.part" | sed 's/^/    /'
     else
       cp -c "$snapshot" "$weights.part"
     fi

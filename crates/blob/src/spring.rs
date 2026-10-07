@@ -1,5 +1,5 @@
 //! A damped spring: the value chases its target and, when the damping is
-//! below 1, overshoots a little before it settles. All of Coco's motion is
+//! below 1, overshoots a little before it settles. All of Traduko's motion is
 //! made of these, which is why nothing starts or stops abruptly.
 
 use std::f32::consts::TAU;

@@ -1,19 +1,19 @@
-//! Tells which language a text is written in, so that Coco can pick the
+//! Tells which language a text is written in, so that Traduko can pick the
 //! direction by itself. It only answers when the text leaves little doubt:
 //! a wrong guess would flip the languages under the user's hands.
 //!
 //! The judgment is the one of macOS: the language recognizer of the
 //! NaturalLanguage framework, which works offline and knows the languages
-//! Coco has models for. It is asked twice. Once among all the languages it
-//! knows, to hear when the text is in one that Coco cannot translate: asked
+//! Traduko has models for. It is asked twice. Once among all the languages it
+//! knows, to hear when the text is in one that Traduko cannot translate: asked
 //! to choose between French and English, it would call Italian French. Then
 //! among the languages that are installed, which is where it is good with a
 //! few words.
 
-use coco_engine::Language;
 use objc2::rc::Retained;
 use objc2_foundation::{NSArray, NSString};
 use objc2_natural_language::NLLanguageRecognizer;
+use traduko_engine::Language;
 
 /// How likely the recognizer must find a language to be believed.
 const SURE: f64 = 0.9;

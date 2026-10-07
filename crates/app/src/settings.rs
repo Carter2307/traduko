@@ -1,16 +1,16 @@
-//! What Coco remembers between two runs, as one small JSON file in
-//! `~/Library/Application Support/Coco`.
+//! What Traduko remembers between two runs, as one small JSON file in
+//! `~/Library/Application Support/Traduko`.
 
 use std::path::{Path, PathBuf};
 
-use coco_engine::{Direction, EnglishVariant, Language, Quality};
 use serde::{Deserialize, Serialize};
+use traduko_engine::{Direction, EnglishVariant, Language, Quality};
 
-pub const APP_DIR: &str = "Coco";
-pub const BUNDLE_ID: &str = "com.github.carter2307.coco";
+pub const APP_DIR: &str = "Traduko";
+pub const BUNDLE_ID: &str = "com.github.carter2307.traduko";
 const FILE: &str = "settings.json";
 
-/// How large Coco is on the desktop.
+/// How large Traduko is on the desktop.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum MascotSize {
@@ -41,7 +41,7 @@ pub struct Settings {
     /// The languages of the last translation.
     pub from: Language,
     pub to: Language,
-    /// Coco works out the language of a text by itself. Off, it is `from`.
+    /// Traduko works out the language of a text by itself. Off, it is `from`.
     pub detect_language: bool,
     pub british: bool,
     pub accurate: bool,
@@ -100,21 +100,21 @@ impl Settings {
     }
 }
 
-/// Where the settings and the instance lock live. `COCO_SUPPORT_DIR` moves
+/// Where the settings and the instance lock live. `TRADUKO_SUPPORT_DIR` moves
 /// them, so that a test run leaves the real preferences alone.
 pub fn support_dir() -> PathBuf {
-    std::env::var_os("COCO_SUPPORT_DIR")
+    std::env::var_os("TRADUKO_SUPPORT_DIR")
         .map(PathBuf::from)
-        .or_else(|| coco_login::bundle::app_support_dir(APP_DIR))
+        .or_else(|| traduko_login::bundle::app_support_dir(APP_DIR))
         .unwrap_or_else(|| std::env::temp_dir().join(APP_DIR))
 }
 
-/// Where the models are: `COCO_MODELS_DIR`, else the usual folder whatever
-/// `COCO_SUPPORT_DIR` says, since the models are large and shared.
+/// Where the models are: `TRADUKO_MODELS_DIR`, else the usual folder whatever
+/// `TRADUKO_SUPPORT_DIR` says, since the models are large and shared.
 pub fn models_dir() -> PathBuf {
-    std::env::var_os("COCO_MODELS_DIR")
+    std::env::var_os("TRADUKO_MODELS_DIR")
         .map(PathBuf::from)
-        .or_else(|| coco_login::bundle::app_support_dir(APP_DIR).map(|dir| dir.join("models")))
+        .or_else(|| traduko_login::bundle::app_support_dir(APP_DIR).map(|dir| dir.join("models")))
         .unwrap_or_else(|| support_dir().join("models"))
 }
 
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn settings_survive_a_save_and_a_load() {
-        let dir = std::env::temp_dir().join(format!("coco-settings-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("traduko-settings-{}", std::process::id()));
         let settings = Settings {
             mascot: Some((120.0, 48.5)),
             mascot_size: MascotSize::Large,
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn a_missing_or_broken_file_gives_the_defaults() {
-        let dir = std::env::temp_dir().join(format!("coco-settings-broken-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("traduko-settings-broken-{}", std::process::id()));
         assert_eq!(Settings::load(&dir), Settings::default());
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join(FILE), b"{ not json").unwrap();
@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn a_file_written_before_the_size_setting_gives_the_medium_mascot() {
-        let dir = std::env::temp_dir().join(format!("coco-settings-older-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("traduko-settings-older-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join(FILE), br#"{ "british": true, "accurate": false }"#).unwrap();
         let settings = Settings::load(&dir);
@@ -165,11 +165,12 @@ mod tests {
 
     #[test]
     fn a_file_written_when_there_were_two_languages_starts_from_french_to_english() {
-        let dir = std::env::temp_dir().join(format!("coco-settings-two-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("traduko-settings-two-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join(FILE), br#"{ "french_to_english": false, "british": true }"#).unwrap();
         let settings = Settings::load(&dir);
-        // Which of the two it was does not matter: Coco reads it off the text.
+        // Which of the two it was does not matter: Traduko reads it off the
+        // text.
         assert_eq!(settings.direction(), Direction::new(Language::FRENCH, Language::ENGLISH));
         assert!(settings.detect_language && settings.british);
         std::fs::remove_dir_all(&dir).unwrap();

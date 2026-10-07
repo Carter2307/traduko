@@ -1,16 +1,16 @@
 //! Downloads models the way the app does, without the app.
 //!
-//!     cargo run --release -p coco-engine --example install -- light|accurate|LANGUAGE [MODELS_DIR]
+//!     cargo run --release -p traduko-engine --example install -- light|accurate|LANGUAGE [MODELS_DIR]
 //!
 //! `light` and `accurate` are the two sets of French and English. A
 //! language is a code like `es`: its two small models, to English and from
 //! it. Without a folder, the models go where the app reads them: see
-//! `coco_engine::default_models_dir`.
+//! `traduko_engine::default_models_dir`.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use coco_engine::{InstallUpdate, Language, Quality, default_models_dir, download_size, install, install_language, language_download_size, languages};
+use traduko_engine::{InstallUpdate, Language, Quality, default_models_dir, download_size, install, install_language, language_download_size, languages};
 
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();

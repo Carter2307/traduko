@@ -934,65 +934,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "coco"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "coco-blob",
- "coco-engine",
- "coco-login",
- "futures",
- "gpui-component",
- "gpui-kit-assets",
- "gpui-pre",
- "gpui-pre-platform",
- "objc2 0.6.5",
- "objc2-app-kit 0.3.2",
- "objc2-foundation 0.3.2",
- "objc2-natural-language",
- "raw-window-handle",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "coco-blob"
-version = "0.1.0"
-dependencies = [
- "png 0.17.16",
-]
-
-[[package]]
-name = "coco-dialect"
-version = "0.1.0"
-
-[[package]]
-name = "coco-engine"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "candle-core",
- "candle-nn",
- "coco-dialect",
- "futures-channel",
- "futures-executor",
- "half",
- "libc",
- "serde",
- "serde_json",
- "sha2 0.11.0",
-]
-
-[[package]]
-name = "coco-login"
-version = "0.1.0"
-dependencies = [
- "objc2 0.6.5",
- "objc2-foundation 0.3.2",
- "objc2-service-management",
-]
-
-[[package]]
 name = "cocoa"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7396,6 +7337,65 @@ dependencies = [
  "thread_local",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "traduko"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "gpui-component",
+ "gpui-kit-assets",
+ "gpui-pre",
+ "gpui-pre-platform",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "objc2-natural-language",
+ "raw-window-handle",
+ "serde",
+ "serde_json",
+ "traduko-blob",
+ "traduko-engine",
+ "traduko-login",
+]
+
+[[package]]
+name = "traduko-blob"
+version = "0.1.0"
+dependencies = [
+ "png 0.17.16",
+]
+
+[[package]]
+name = "traduko-dialect"
+version = "0.1.0"
+
+[[package]]
+name = "traduko-engine"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "candle-core",
+ "candle-nn",
+ "futures-channel",
+ "futures-executor",
+ "half",
+ "libc",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "traduko-dialect",
+]
+
+[[package]]
+name = "traduko-login"
+version = "0.1.0"
+dependencies = [
+ "objc2 0.6.5",
+ "objc2-foundation 0.3.2",
+ "objc2-service-management",
 ]
 
 [[package]]

@@ -447,7 +447,7 @@ fn start(models_dir: PathBuf, sources: Vec<&'static Source>, turn: &'static Mute
         };
         let _ = updates.unbounded_send(last);
     };
-    if std::thread::Builder::new().name("coco-install".into()).spawn(work).is_err() {
+    if std::thread::Builder::new().name("traduko-install".into()).spawn(work).is_err() {
         let _ = refused.unbounded_send(InstallUpdate::Failed("The download could not start.".into()));
     }
     stream
@@ -745,7 +745,7 @@ mod tests {
     }
 
     fn models(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("coco-install-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("traduko-install-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         dir
     }

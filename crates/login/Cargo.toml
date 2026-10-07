@@ -1,5 +1,5 @@
 [package]
-name = "coco-login"
+name = "traduko-login"
 description = "Launch at login (SMAppService with a LaunchAgent fallback), single-instance lock, bundle paths"
 version.workspace = true
 edition.workspace = true

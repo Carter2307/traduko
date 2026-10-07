@@ -1,11 +1,11 @@
-//! The first run, as three screens in one window: what Coco does, the model
+//! The first run, as three screens in one window: what Traduko does, the model
 //! it needs, and the one thing macOS has to allow. A screen with nothing to
 //! ask is left out, and the screen of the models also opens alone, later, to
 //! add the other one. So does a fourth screen, which is never part of the
 //! first run: the languages that can be added to French and English.
 //!
 //! The window is built like the panel: a shell that holds three cards. The
-//! top one is Coco itself, alive: it watches the pointer, thinks while a
+//! top one is Traduko itself, alive: it watches the pointer, thinks while a
 //! model downloads and hops when it is there.
 
 use std::cell::Cell;
@@ -13,8 +13,6 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use coco_blob::{CANVAS, Mascot, Mood};
-use coco_engine::{Direction, InstallUpdate, Installed, Language, Quality, download_size, install, install_language, language_download_size, languages};
 use futures::StreamExt as _;
 use futures::channel::mpsc::UnboundedReceiver;
 use gpui::{
@@ -24,22 +22,24 @@ use gpui::{
 };
 use gpui_component::Icon;
 use gpui_kit_assets::IconName;
+use traduko_blob::{CANVAS, Mascot, Mood};
+use traduko_engine::{Direction, InstallUpdate, Installed, Language, Quality, download_size, install, install_language, language_download_size, languages};
 
 use crate::login::{self, Permission};
 use crate::mascot_view;
 use crate::native;
 use crate::theme::{self, MONO, Palette, SHELL_PAD, SHELL_RADIUS, card, chip, grip};
 
-actions!(coco_onboarding, [NextStep, CloseOnboarding]);
+actions!(traduko_onboarding, [NextStep, CloseOnboarding]);
 
-pub const KEY_CONTEXT: &str = "CocoOnboarding";
+pub const KEY_CONTEXT: &str = "TradukoOnboarding";
 
 /// The shell, without the transparent margin that holds its shadow.
 pub const SHELL_WIDTH: f32 = 440.0;
 pub const SHELL_HEIGHT: f32 = 640.0;
 
 /// How often the login item is read again while macOS waits for the user:
-/// the answer is given in System Settings, and nothing tells Coco.
+/// the answer is given in System Settings, and nothing tells Traduko.
 const ASK_AGAIN: Duration = Duration::from_millis(1500);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -63,7 +63,7 @@ pub fn steps(first_run: bool, permission: Permission) -> Vec<Step> {
 }
 
 pub enum OnboardingEvent {
-    /// Coco's mood changed here: the mascot on the desktop follows.
+    /// Traduko's mood changed here: the mascot on the desktop follows.
     Mood(Mood),
     /// A model set or a language is on disk now.
     ModelInstalled,
@@ -157,7 +157,7 @@ pub struct Onboarding {
     watch: Option<Task<()>>,
     mascot: Mascot,
     last_tick: Instant,
-    /// Where Coco was painted last, to know where the pointer is from it.
+    /// Where Traduko was painted last, to know where the pointer is from it.
     hero: Rc<Cell<Option<Bounds<Pixels>>>>,
     wake: Option<Task<()>>,
 }
@@ -354,7 +354,7 @@ impl Onboarding {
         cx.notify();
     }
 
-    // ---- Coco ---------------------------------------------------------------------
+    // ---- Traduko ---------------------------------------------------------------------
 
     /// A hop, then back to what the downloads call for.
     fn cheer(&mut self, cx: &mut Context<Self>) {
@@ -377,7 +377,7 @@ impl Onboarding {
         }
     }
 
-    /// Advances Coco to now and books its next frame: the next display
+    /// Advances Traduko to now and books its next frame: the next display
     /// refresh while something moves, a timer for the next blink otherwise.
     fn tick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let now = Instant::now();
@@ -406,8 +406,8 @@ impl Onboarding {
     }
 }
 
-/// The pointer as Coco sees it from where it is painted, in its own units
-/// from its centre, while the pointer is over the window. Coco is interested
+/// The pointer as Traduko sees it from where it is painted, in its own units
+/// from its centre, while the pointer is over the window. Traduko is interested
 /// up to 6 units away, which is about its own height here, so what is
 /// farther than its body is brought closer: it follows the pointer over the
 /// whole window.
@@ -631,7 +631,7 @@ impl Onboarding {
                     .px(px(14.))
                     .on_click(cx.listener(|_, _, _, cx| cx.background_spawn(async { login::open_system_settings() }).detach()))
                     .child("Open Settings");
-                ("Switch Coco on in System Settings, under Login Items.", Some(open.into_any_element()))
+                ("Switch Traduko on in System Settings, under Login Items.", Some(open.into_any_element()))
             }
             Permission::Unavailable => ("Works once I'm in your Applications folder.", None),
         };
@@ -688,7 +688,7 @@ impl Render for Onboarding {
                     .items_center()
                     .gap(px(14.))
                     .child(grip(&p))
-                    .child(div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(p.ink).child("Coco")),
+                    .child(div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(p.ink).child("Traduko")),
             )
             .child(
                 div()
@@ -713,15 +713,15 @@ impl Render for Onboarding {
             ),
         );
 
-        // ---- Coco, and what this screen is about -------------------------------------
+        // ---- Traduko, and what this screen is about -------------------------------------
         let (headline, about): (&str, &str) = match step {
-            Step::Welcome => ("Bonjour, I'm Coco", "I translate as you type, right here on your desktop."),
+            Step::Welcome => ("Bonjour, I'm Traduko", "I translate as you type, right here on your desktop."),
             Step::Models => ("Download a model", "A model does the translating: these two know French and English. It comes from Hugging Face once, then I work offline."),
             Step::Languages => ("Add a language", "Each one is two small models, to English and from it. Between two of them, I go through English."),
             Step::Login => ("Keep me around", "With your permission I open by myself when you log in, so I'm here after a restart."),
         };
         let (frame, seen) = (self.mascot.frame(), self.hero.clone());
-        let coco = canvas(
+        let traduko = canvas(
             |_, _, _| (),
             move |bounds, _, window, _| {
                 seen.set(Some(bounds));
@@ -736,7 +736,7 @@ impl Render for Onboarding {
             Step::Models | Step::Login => 124.,
         }));
         // The languages are more than the window is tall: their list takes
-        // the room and scrolls, and Coco keeps to what it needs.
+        // the room and scrolls, and Traduko keeps to what it needs.
         let scrolls = step == Step::Languages;
         let hero = card(&p)
             .flex()
@@ -745,10 +745,10 @@ impl Render for Onboarding {
             .items_center()
             .justify_center()
             .px(px(28.))
-            // Coco's square has room above the body for its hop: the same
+            // Traduko's square has room above the body for its hop: the same
             // below the text keeps the two in the middle of the card.
             .pb(px(12.))
-            .child(coco)
+            .child(traduko)
             .child(div().mt(px(4.)).text_size(px(23.)).font_weight(FontWeight::SEMIBOLD).text_color(p.ink).child(headline))
             .child(div().mt(px(6.)).max_w(px(332.)).text_center().text_size(px(14.)).line_height(px(20.)).text_color(p.muted).child(about));
 
@@ -800,7 +800,7 @@ impl Render for Onboarding {
             .cursor_pointer()
             .hover(|style| style.text_color(p.ink))
             .on_click(cx.listener(|_, _, _, cx| cx.emit(OnboardingEvent::QuitRequested)))
-            .child("Quit Coco");
+            .child("Quit Traduko");
         let footer = card(&p).flex().flex_none().items_center().justify_between().h(px(56.)).pl(px(12.)).pr(px(10.)).child(
             div()
                 .flex()
@@ -823,12 +823,12 @@ impl Render for Onboarding {
         );
 
         let shell = div()
-            .id("coco-onboarding")
+            .id("traduko-onboarding")
             .key_context(KEY_CONTEXT)
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &NextStep, _, cx| this.next(cx)))
             .on_action(cx.listener(|_, _: &CloseOnboarding, _, cx| cx.emit(OnboardingEvent::Dismissed)))
-            // Coco looks at the pointer: every move is a new frame.
+            // Traduko looks at the pointer: every move is a new frame.
             .on_mouse_move(cx.listener(|_, _, _, cx| cx.notify()))
             .w(px(SHELL_WIDTH))
             .h(px(SHELL_HEIGHT))

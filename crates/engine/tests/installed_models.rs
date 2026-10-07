@@ -1,9 +1,9 @@
 //! Tests with the real models, through the public API.
 //!
 //! They need the models that `scripts/fetch-models.sh` installs (in
-//! `$COCO_MODELS_DIR` or `~/Library/Application Support/Coco/models`). When a
-//! set is missing, its tests say so and pass: the unit tests cover the rest
-//! without any model.
+//! `$TRADUKO_MODELS_DIR` or `~/Library/Application Support/Traduko/models`).
+//! When a set is missing, its tests say so and pass: the unit tests cover the
+//! rest without any model.
 //!
 //! The matrix kernels are fifty times slower when the dependencies are not
 //! optimised, which is the default of `cargo test`. The tests still pass
@@ -12,7 +12,7 @@
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
-use coco_engine::{Direction, EnglishVariant, Installed, Language, Quality, Request, Translator, Update, default_models_dir};
+use traduko_engine::{Direction, EnglishVariant, Installed, Language, Quality, Request, Translator, Update, default_models_dir};
 
 const FR_EN: Direction = Direction::new(Language::FRENCH, Language::ENGLISH);
 const EN_FR: Direction = FR_EN.swapped();

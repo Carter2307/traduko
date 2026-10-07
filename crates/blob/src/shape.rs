@@ -14,7 +14,7 @@ pub type Radii = [f32; N];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Shape {
-    /// Speech bubble with a small tail: Coco at rest.
+    /// Speech bubble with a small tail: Traduko at rest.
     Bubble,
     Cloud,
     Capsule,

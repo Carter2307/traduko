@@ -1,7 +1,7 @@
 //! The languages, and the way from one to another.
 //!
 //! A language is its two-letter code and nothing else: the engine has no
-//! list of the ones it knows. What Coco can translate is what the model
+//! list of the ones it knows. What Traduko can translate is what the model
 //! folders on disk say (`store`), so a language is added by installing its
 //! models, not by changing this crate. The table here only gives names to
 //! the codes, for the UI and for messages.

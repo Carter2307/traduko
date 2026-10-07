@@ -1,11 +1,9 @@
-//! Coco as a whole: the mascot on the desktop, the translator panel it
+//! Traduko as a whole: the mascot on the desktop, the translator panel it
 //! opens, the screens of the first run, the engine behind them, and what is
 //! remembered between runs.
 
 use std::path::PathBuf;
 
-use coco_blob::Mood;
-use coco_engine::{Installed, Quality, Translator};
 use gpui::{
     AnyWindowHandle, App, Bounds, Context, Entity, Styled as _, Subscription, WindowBackgroundAppearance,
     WindowBounds, WindowKind, WindowOptions, point, prelude::*, px, size,
@@ -13,6 +11,8 @@ use gpui::{
 use gpui_component::Root;
 use objc2::rc::Retained;
 use objc2_app_kit::NSWindow;
+use traduko_blob::Mood;
+use traduko_engine::{Installed, Quality, Translator};
 
 use crate::login::{self, Permission};
 use crate::mascot_view::{self, MascotEvent, MascotView};
@@ -37,7 +37,7 @@ struct OnboardingWindow {
     _events: Subscription,
 }
 
-pub struct Coco {
+pub struct Traduko {
     support: PathBuf,
     settings: Settings,
     translator: Translator,
@@ -50,7 +50,7 @@ pub struct Coco {
     _mascot_events: Subscription,
 }
 
-impl Coco {
+impl Traduko {
     /// Opens the mascot and starts everything behind it.
     pub fn start(support: PathBuf, cx: &mut App) -> anyhow::Result<Entity<Self>> {
         let settings = Settings::load(&support);
@@ -71,8 +71,8 @@ impl Coco {
 
             let mut this =
                 Self { support, settings, translator, models, installed, mascot, mascot_window, panel: None, onboarding: None, _mascot_events: mascot_events };
-            // The first run asks before Coco becomes a login item. A copy that
-            // was one before these screens existed stays one.
+            // The first run asks before Traduko becomes a login item. A copy
+            // that was one before these screens existed stays one.
             if this.settings.onboarded || this.settings.registered_install.is_some() {
                 this.reconcile_login(cx);
             }
@@ -121,7 +121,8 @@ impl Coco {
     /// Shows the panel next to the mascot. `take_keyboard` is false only for
     /// captures made while somebody is typing elsewhere.
     pub fn show_panel(&mut self, take_keyboard: bool, cx: &mut Context<Self>) {
-        // While the first screens are up, they are what a click on Coco is for.
+        // While the first screens are up, they are what a click on Traduko
+        // is for.
         if self.onboarding.is_some() {
             return self.raise_onboarding(None, take_keyboard, cx);
         }
@@ -133,7 +134,7 @@ impl Coco {
             match self.open_panel(cx) {
                 Ok(panel) => self.panel = Some(panel),
                 Err(error) => {
-                    eprintln!("coco: cannot open the panel: {error:#}");
+                    eprintln!("traduko: cannot open the panel: {error:#}");
                     self.mascot.update(cx, |mascot, cx| mascot.set_mood(Mood::Sorry, cx));
                     return;
                 }
@@ -205,7 +206,7 @@ impl Coco {
         match self.open_onboarding(steps, permission, cx) {
             Ok(onboarding) => self.onboarding = Some(onboarding),
             Err(error) => {
-                eprintln!("coco: cannot open the first screens: {error:#}");
+                eprintln!("traduko: cannot open the first screens: {error:#}");
                 return;
             }
         }
@@ -262,7 +263,7 @@ impl Coco {
                 is_resizable: false,
                 is_minimizable: false,
                 app_owns_titlebar_drag: true,
-                // Coco moves in it while the app is not the active one.
+                // Traduko moves in it while the app is not the active one.
                 inactive_frame_interval: None,
                 ..Default::default()
             },
@@ -422,7 +423,7 @@ impl Coco {
                     let direction = panel.direction();
                     (self.settings.from, self.settings.to) = (direction.from, direction.to);
                     self.settings.detect_language = panel.detects();
-                    self.settings.british = panel.english() == coco_engine::EnglishVariant::British;
+                    self.settings.british = panel.english() == traduko_engine::EnglishVariant::British;
                     // Keep the wish for a model that is not installed yet.
                     if panel.quality() != self.settings.quality(&self.installed.qualities()) {
                         self.settings.accurate = panel.quality() == Quality::Accurate;
@@ -465,7 +466,7 @@ impl Coco {
 
     fn on_login_outcome(&mut self, mut outcome: login::Outcome, cx: &mut Context<Self>) {
         if let Some(note) = outcome.note.take() {
-            eprintln!("coco: open at login: {note}");
+            eprintln!("traduko: open at login: {note}");
         }
         if outcome.apply(&mut self.settings) {
             self.save();
@@ -478,23 +479,23 @@ impl Coco {
 
     fn save(&self) {
         if let Err(error) = self.settings.save(&self.support) {
-            eprintln!("coco: cannot save the settings: {error}");
+            eprintln!("traduko: cannot save the settings: {error}");
         }
     }
 }
 
-/// False in a capture run (`COCO_PANEL=1`), which leaves the keyboard to
+/// False in a capture run (`TRADUKO_PANEL=1`), which leaves the keyboard to
 /// whoever is typing: a window that opens by itself must not take it.
 fn takes_keyboard() -> bool {
-    std::env::var_os("COCO_PANEL").is_none()
+    std::env::var_os("TRADUKO_PANEL").is_none()
 }
 
-/// Keeps the app's one `Coco` alive for as long as the app runs.
-pub struct Running(pub Entity<Coco>);
+/// Keeps the app's one `Traduko` alive for as long as the app runs.
+pub struct Running(pub Entity<Traduko>);
 
 impl gpui::Global for Running {}
 
-pub fn running(cx: &App) -> Option<Entity<Coco>> {
+pub fn running(cx: &App) -> Option<Entity<Traduko>> {
     cx.try_global::<Running>().map(|running| running.0.clone())
 }
 
