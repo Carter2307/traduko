@@ -37,7 +37,7 @@
   .hero-actions { @apply mt-8 flex justify-center; }
   .hero-footnote { @apply mt-5 text-[11px] font-medium text-[#756b60]; }
   .hero-footnote > span { @apply mx-2; }
-  .hero-video { @apply relative mx-auto mt-14 max-w-[920px] overflow-hidden rounded-[20px] bg-black/[0.03] outline outline-black/[0.06] sm:mt-16 sm:rounded-[28px]; box-shadow: 0 20px 60px -28px #65432635; }
+  .hero-video { @apply relative mt-14 w-full overflow-hidden bg-black/[0.03] sm:mt-16; }
   .hero-video video { @apply block aspect-video h-auto w-full; }
   .feature-showcase { @apply mt-8 grid gap-6 sm:mt-12 md:grid-cols-2; }
   .feature-card { @apply flex min-w-0 flex-col overflow-hidden rounded-[32px] bg-[#f5f5f7]; }

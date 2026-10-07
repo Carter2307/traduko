@@ -46,9 +46,9 @@ function App() {
       </header>
 
       <main id="main">
-        <section className="hero section-shell" aria-labelledby="hero-heading">
+        <section className="hero" aria-labelledby="hero-heading">
           <HeroShader />
-          <div className="hero-intro">
+          <div className="hero-intro section-shell">
             <HeroMascot />
             <h1 id="hero-heading" className="hero-heading hero-enter">
               Translate anytime<br />
