@@ -184,6 +184,13 @@ impl Panel {
                 }
             }),
             cx.observe_window_appearance(window, |_, window, cx| theme::apply(window.appearance(), cx)),
+            // The keyboard went to another window without a click to tell
+            // of it: Cmd-Tab, Spotlight, an app that came in front.
+            cx.observe_window_activation(window, |_, window, cx| {
+                if !window.is_window_active() {
+                    cx.emit(PanelEvent::HideRequested);
+                }
+            }),
         ];
 
         Self {
