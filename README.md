@@ -1,0 +1,93 @@
+# Coco
+
+A French and English translator that lives on the desktop. Coco is a small
+mascot that floats over your windows; click it and a translator panel opens
+beside it. Translation runs on this Mac, with no network.
+
+- **French to English and English to French**, as you type.
+- **American or British English** for the English side.
+- **Two models**: a light one and a more accurate one.
+- **Comes back after a restart**: Coco opens at login, once you allow it.
+
+## Install
+
+```bash
+scripts/install.sh --launch
+```
+
+This fetches the models once (about 1.2 GB into
+`~/Library/Application Support/Coco/models`), builds the app, makes `Coco.app`,
+installs it in `~/Applications` and opens it. Run it again after a change to
+install the new build.
+
+The first time it opens, Coco shows three screens: what it does, the model
+to download, and the permission to open at login. The last one is left out
+when there is nothing to allow. `install.sh` has fetched the models already,
+so the second screen finds them; a copy of the app that came without them
+downloads them there, from Hugging Face, with the `curl` of macOS.
+
+To remove everything (dry run first, then `--yes`):
+
+```bash
+scripts/uninstall.sh
+```
+
+## Use
+
+| Do this | To get this |
+|---|---|
+| Click Coco | Open or close the panel |
+| Drag Coco | Move it; the place is remembered |
+| Type or paste in the top card | The translation, a moment after you stop |
+| The arrows in the top card, or ⌘⇧S | Swap the languages |
+| American / British | Choose the English you want |
+| Light / Accurate | Choose the model and Coco's size (small, medium, large), download the other model, open at login, quit |
+| ⌘⇧C, or Copy | Copy the translation |
+| Esc, or × | Close the panel |
+
+## How it is made
+
+| Crate | What it holds |
+|---|---|
+| `crates/app` | The windows (mascot, panel, first screens), in [GPUI](https://www.gpui.rs) |
+| `crates/blob` | Coco's shapes and motion: springs, blinks, hops. No UI dependency |
+| `crates/engine` | The models and their download, the sentence pipeline and the worker thread |
+| `crates/dialect` | American and British spelling and vocabulary |
+| `crates/login` | Open at login, one running copy, bundle paths |
+
+The models are [OPUS-MT](https://github.com/Helsinki-NLP/Opus-MT) from
+Helsinki-NLP on Hugging Face (`opus-mt-fr-en`, `opus-mt-en-fr` and their
+`tc-big` versions), run with [candle](https://github.com/huggingface/candle).
+They translate one sentence at a time, and they translate idioms word for
+word: "il pleut des cordes" becomes "it's raining ropes".
+
+American and British English come from a word list
+([VarCon](http://wordlist.aspell.net/varcon/)) applied to the English text
+after translation; the notices are in `crates/dialect`.
+
+## Develop
+
+```bash
+cargo run -p coco                      # the app, without a bundle
+cargo test --workspace                 # every test
+cargo run -p coco-blob --example sheet -- sheet.svg   # Coco's poses as a picture
+cargo run --release -p coco-engine --example install -- light   # download a set as the app does
+cargo run --release -p coco-blob --example icon -- assets/icon-1024.png
+```
+
+Ways to drive the app without the mouse, for captures:
+`COCO_DEMO=1` plays every mood, `COCO_PANEL=1` opens the panel without taking
+the keyboard, `COCO_TEXT="..."` types into it, `COCO_APPEARANCE=light|dark`
+forces a theme, `COCO_CLICK="x,y"` clicks a point of the panel inside the app,
+`COCO_FPS=1` prints the mascot's frame rate, `COCO_SUPPORT_DIR=<folder>`
+keeps the run away from the real settings, `COCO_QUIT_AFTER=<seconds>` ends
+the run.
+
+The first screens come back with settings that never saw them: an empty
+`COCO_SUPPORT_DIR`, and an empty `COCO_MODELS_DIR` for the download. While
+they are up, `COCO_PANEL` and `COCO_CLICK` drive them in place of the panel.
+A development build cannot be a login item, so `COCO_LOGIN_ITEM=ask|allowed|approval`
+answers for macOS and brings the third screen.
+
+The build needs the `runtime_shaders` feature of GPUI (set in
+`crates/app/Cargo.toml`) unless Xcode's Metal Toolchain is installed.

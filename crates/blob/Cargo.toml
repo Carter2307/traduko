@@ -1,0 +1,13 @@
+[package]
+name = "coco-blob"
+description = "Coco's body and eyes: shapes, springs and motion, with no UI dependency"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+# Only for the `icon` example, which writes a PNG.
+png = "0.17"

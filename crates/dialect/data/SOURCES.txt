@@ -1,0 +1,15 @@
+Fetched 2026-10-07.
+
+varcon/      https://raw.githubusercontent.com/en-wl/wordlist/b22230cc5250887737fdefe9ca4c9d9d01230eaa/varcon/
+             (repository en-wl/wordlist, branch v1; VarCon version 2020.12.07; varcon.txt is Latin-1)
+             EMBEDDED after processing by scripts/gen_maps.py.  Licence: see ../LICENSE-VARCON.
+hyperreality/ https://raw.githubusercontent.com/hyperreality/American-British-English-Translator/f9e0714e0cd8aa09c1276db16b87c2a2e14f18e5/
+             comparison only, NOT embedded.
+marian-en-fr/, marian-tc-big-en-fr/
+             source.spm, vocab.json (and README.md) of Helsinki-NLP/opus-mt-en-fr and
+             Helsinki-NLP/opus-mt-tc-big-en-fr on huggingface.co; tokenizer files only, no weights;
+             used by scripts/marian_vocab_check.py.  NOT embedded.
+corpus/      `man zshall bash perlfaq4 perlstyle perlfunc git-config rsync ssh_config curl | col -bx`
+             (local machine), used by examples/audit.rs.  NOT embedded.
+extra_spelling.tsv   hand-written, original.
+report_ambiguous.txt, report_untrusted.txt   written by scripts/gen_maps.py.

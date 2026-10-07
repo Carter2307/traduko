@@ -1,0 +1,33 @@
+[package]
+name = "coco"
+description = "Coco: a translator that lives on the desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+coco-blob = { path = "../blob" }
+coco-engine = { path = "../engine" }
+coco-login = { path = "../login" }
+
+# Zed's gpui as republished for gpui-component 0.7.1, which pins exactly this version.
+gpui = { package = "gpui-pre", version = "=0.3.8" }
+# font-kit: the real text system on macOS. runtime_shaders: compile the Metal shaders at
+# start-up, so the build does not need Xcode's separate Metal Toolchain download.
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.8", features = ["font-kit", "runtime_shaders"] }
+
+gpui-component = "=0.7.1"
+gpui-kit-assets = "=0.7.1"
+
+futures = "0.3"
+raw-window-handle = "0.6"
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+objc2-foundation = "0.3"
+# The language recognizer of macOS: it tells which language a text is in.
+objc2-natural-language = { version = "0.3", default-features = false, features = ["std", "NLLanguage", "NLLanguageRecognizer"] }
+
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

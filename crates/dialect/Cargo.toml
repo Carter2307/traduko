@@ -1,0 +1,15 @@
+[package]
+name = "coco-dialect"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"          # std::sync::LazyLock
+description = "Deterministic American <-> British English post-editing (spelling + conservative vocabulary)"
+license = "MIT AND LicenseRef-VarCon"
+publish = false
+
+[lib]
+name = "dialect"
+path = "src/lib.rs"
+
+# No dependencies on purpose: the word lists are embedded with include_str!.
+[dependencies]

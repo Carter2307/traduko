@@ -1,0 +1,40 @@
+# Hand-written corrections applied by scripts/gen_maps.py on top of VarCon.
+# Tab separated.  Kinds:
+#   del-b2a <british...>           remove british -> american pairs
+#   del-a2b <american...>          remove american -> british pairs
+#   pair    <american> <british> [<oxford>]   add a pair in both directions
+#   ize     <stem...>              add the whole -ize/-ise family of a stem (tokenize ...)
+# This file is original work for this spike (word pairs are facts); no third-party licence.
+
+# "spelt" is also the cereal ("spelt flour"); "spilt" / "spoilt" are accepted adjectives in the US
+del-b2a	spelt	spilt	spoilt
+# Scotch whisky / Irish whiskey depend on the origin of the drink, not on the dialect
+del-b2a	whisky	whiskies
+del-a2b	whiskey	whiskeys
+# "prized possession" must not become "prised possession"; "come to naught" is British too
+del-a2b	prized	prizing	naught	naughts
+del-b2a	nought	noughts
+# junk or risky pairs from unverified VarCon clusters
+del-a2b	patine	patined	cardie	costumier	ecus	maters	perv	novene	fayer	manila	lasagna	lasagnas	bused	busing
+del-b2a	fayre	prev	matres	oecus	manilla	lasagne	lasagnes	saki	sakis	hippy	flyer	flyers
+# "prise open" -> US "pry open"; VarCon's "prize open" is correct but reads like an error
+del-b2a	prise	prised	prises	prising
+# correct but the result can read as a slur; leave these rare words alone
+del-a2b	fagot	fagots	dike	dikes	diked	diking
+del-b2a	dyked	dyking
+# tsar/czar: both are used in American English
+del-b2a	tsar	tsars	tsarina	tsarinas	tsarist	tsarists	tsarism
+del-a2b	czar	czars	czarina	czarinas	czarist	czarists	czarism
+# mom/mum, ass/arse are vocabulary, not spelling: the vocabulary layer decides
+del-a2b	mom	moms	mommy	mommies
+del-b2a	mums	mummy	mummies	arse	arses
+
+# everyday / technical words missing from VarCon
+pair	synthesizer	synthesiser	synthesizer
+pair	synthesizers	synthesisers	synthesizers
+ize	token	production	binar	discret	virtual	pseudonym	operational	component	canonical	memo	depriorit	weapon	container	incentiv	contextual	modular
+# VarCon's porer/pourer row is junk ("pourer" is the same word everywhere)
+del-a2b	porer	porers
+del-b2a	pourer	pourers
+pair	curbside	kerbside
+pair	multistory	multistorey

@@ -1,0 +1,71 @@
+# British -> American rules.  Original work for this spike (hand curated); no third-party licence.
+# Same format as rules_a2b.tsv:
+# layer <TAB> source <TAB> target <TAB> guards
+#   layer  S = spelling homograph (applies when spelling is on)
+#          V = vocabulary, "safe" tier      X = vocabulary, "extended" tier (assumption about the text)
+
+# ---------------------------------------------------------------- spelling homographs
+# "analyses" is the plural noun in both dialects; only the verb becomes "analyzes"
+S	analyses	analyzes	n+:the,a,an,how,why,what,whether,this,these,those,its,their,his,her,each,all,data;p-:the,these,those,of,and,statistical,such,our,their,further,more,many,several,two,three,detailed,new
+# the game of draughts is not "drafts"
+S	draughts	=	p+:play,played,playing,plays,of
+# the British party keeps its name
+S	labour	=	title;n+:mp,mps,leader,leaders,government,party,minister,ministers,politician,politicians,peer,peers,backbencher,backbenchers,councillor,councillors,voters,manifesto,conference,frontbench,spokesman,spokeswoman,spokesperson,candidate,candidates,leadership
+S	labour party|ministry of defence|royal college of defence studies|centre pompidou|globe theatre|national theatre|royal opera house	=
+
+# ---------------------------------------------------------------- vocabulary, safe tier
+V	lorry|lorries	truck|trucks
+V	block of flats|blocks of flats	apartment building|apartment buildings
+# "flat": only after a determiner AND before a word that cannot follow the adjective
+V	flat	apartment	p+:my,your,his,her,our,their,whose;n+:|,in,on,at,near,is,was,has,had,with,and,or,to,for,from,above,below,where,which,that,when,because,but,by,overlooking,next,opposite,there,here,until,since,before,after,while,will,would,can,could,should,must,looks,feels,costs,needs,upstairs,downstairs,together,alone,now,yesterday,today,tomorrow,every,last,again,too,itself,was,were,'s
+V	flat	apartment	p+:a,the,this,that,new,old,small,big,tiny,shared,rented,studio,bedroom,basement,council,floor,same,own,first,luxury,empty,furnished,unfurnished,spacious,cramped,little,large,nice,lovely,whole,entire,student;n+:|,in,on,at,near,is,was,has,had,with,to,for,from,above,below,where,which,that,when,because,but,by,overlooking,next,opposite,there,here,until,since,before,after,while,will,would,can,could,should,must,looks,feels,costs,needs,upstairs,downstairs,together,alone,now,yesterday,today,tomorrow,every,last,again,too,itself,was,were,'s
+V	flats	apartments	p+:the,these,those,new,luxury,council,rented,student,of,#,many,several,some,both;s-:mud,salt,tidal,shoes,heels,ballet
+V	flatmate|flatmates	roommate|roommates
+# "lift": the noun after "the" and friends, never the ride or the verb
+V	lift	elevator	p+:the,by,this,that,our,hotel,service,glass,goods,passenger,broken,nearest,main,private,staff;n-:of;s-:thanks,thank,gave,give,gives,giving,given,offer,offered,offering,hitch,hitched,ski,skiing,chairlift,boost,face,sales,profit,profits,mood,spirits,price,prices,demand,morale,growth,economy
+V	lifts	elevators	p+:the,two,three,four,both,these,those,passenger,goods,hotel,glass,#;n-:of,up,off,weights,his,her,their,my,your,the,a,him,them,it,me,us
+V	petrol station|petrol stations|petrol pump|petrol pumps|petrol tank|petrol tanks|out of petrol|petrol prices	gas station|gas stations|gas pump|gas pumps|gas tank|gas tanks|out of gas|gas prices
+V	petrol	gasoline	n-:blue
+V	pavement|pavements	sidewalk|sidewalks	p-:road,asphalt,concrete,flexible,rigid,airport,highway;n-:of,design,engineering,structure,layer,layers,thickness
+V	on holiday|on holidays	on vacation|on vacation
+V	holidaymaker|holidaymakers	vacationer|vacationers
+V	summer holiday|summer holidays|family holiday|family holidays|school holidays|skiing holiday	summer vacation|summer vacation|family vacation|family vacations|school vacation|skiing vacation
+V	package holiday|package holidays|holiday home|holiday homes	vacation package|vacation packages|vacation home|vacation homes
+V	holiday in	vacation in	p-:public,bank,national,religious,federal,christmas,easter,official,jewish,muslim,christian,legal,paid,school;n-:question
+V	holiday	vacation	p+:my,our,their,your,his,her;n+:|,in,on,at,was,is,to,with,and,abroad,for,by,together,because,when,but;s-:christmas,easter,bank,public,national,thanksgiving,religious,celebrate,celebrated,celebrates
+V	bank holiday|bank holidays|public holiday|public holidays	=
+V	multi-storey car park|multi-storey car parks	parking garage|parking garages
+V	car park|car parks	parking lot|parking lots
+V	motorway|motorways	highway|highways
+V	mobile phone|mobile phones	cell phone|cell phones
+V	postcode|postcodes	postal code|postal codes
+V	nappy|nappies	diaper|diapers
+V	aubergine|aubergines	eggplant|eggplants
+V	courgette|courgettes	zucchini|zucchini
+V	crisps	potato chips
+V	candy floss	cotton candy
+V	number plate|number plates	license plate|license plates
+V	driving licence|driving licences	driver's license|driver's licenses
+V	zebra crossing|zebra crossings	crosswalk|crosswalks
+V	windscreen|windscreens	windshield|windshields
+V	estate agent|estate agents	real estate agent|real estate agents
+V	pushchair|pushchairs	stroller|strollers
+V	a fortnight	two weeks
+V	whilst	while
+V	at the weekend|at weekends	on the weekend|on weekends
+V	mum's the word	=
+V	mum|mums	mom|moms	p-:keep,keeps,keeping,kept,stay,stays,stayed,staying
+
+# ---------------------------------------------------------------- vocabulary, extended tier
+# right when the text comes from French ("football" = soccer), wrong for a text about the NFL
+X	american football	=
+X	football|footballs	soccer|soccer balls	p-:american,gridiron,fantasy,college,flag,table
+X	footballer|footballers	soccer player|soccer players
+X	biscuit|biscuits	cookie|cookies	p-:dog,cheese,sea,ship,water,savoury,digestive;s-:cheese,dog,gravy
+X	torch|torches	flashlight|flashlights	s-:olympic,flame,flames,flaming,burning,lit,fire,procession,relay,medieval,castle
+# "the key takeaway" (the lesson) is the same word in both dialects
+X	takeaway	takeout	p-:key,main,big,biggest,important,one,first,second,another,real,critical
+X	trainers	sneakers	p+:my,your,his,her,their,of,new,running,wearing,white,black
+X	draughts	checkers	p+:play,played,playing,plays,of
+X	rubbish bin|rubbish bins	trash can|trash cans
+X	cinema|cinemas	movie theater|movie theaters	p+:the,a,local,nearest,this,that,to

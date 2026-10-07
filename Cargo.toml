@@ -1,0 +1,29 @@
+[workspace]
+resolver = "2"
+members = ["crates/blob", "crates/dialect", "crates/engine", "crates/login", "crates/app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true
+
+# The model is unusable without optimisation, even while developing.
+[profile.dev.package.coco-engine]
+opt-level = 3
+
+[profile.dev.package.candle-core]
+opt-level = 3
+
+[profile.dev.package.candle-nn]
+opt-level = 3
+
+# Half a gigabyte of weights is hashed after a download.
+[profile.dev.package.sha2]
+opt-level = 3

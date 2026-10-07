@@ -1,0 +1,34 @@
+[package]
+name = "coco-engine"
+description = "Offline French and English translation: model, sentence pipeline and worker thread"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+coco-dialect = { path = "../dialect" }
+futures-channel = "0.3"
+
+# Tensors and layers only. The Marian model itself lives in this crate, so
+# candle-transformers (and the tokenizers crate it brings) is not needed.
+#
+# No feature on purpose. The model runs in 16-bit floats, which candle's own
+# kernels compute and Apple's Accelerate cannot: with candle's `accelerate`
+# feature turned on anywhere in the workspace, every matrix product fails at
+# run time. A unit test in `marian.rs` watches for that.
+candle-core = "=0.11.0"
+candle-nn = "=0.11.0"
+# The weights are read straight into typed buffers.
+bytemuck = "1"
+half = { version = "2", features = ["bytemuck"] }
+# mmap and munmap, for the allocator that returns freed weights to the system.
+libc = "0.2"
+# Checks a downloaded model against its known SHA-256. Already in the build:
+# the UI's embedded assets bring it.
+sha2 = "0.11"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+futures-executor = "0.3"

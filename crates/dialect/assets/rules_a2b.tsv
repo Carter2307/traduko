@@ -1,0 +1,104 @@
+# American -> British rules.  Original work for this spike (hand curated); no third-party licence.
+# layer <TAB> source <TAB> target <TAB> guards
+#   layer  S = spelling homograph (applies when spelling is on)
+#          V = vocabulary, "safe" tier      X = vocabulary, "extended" tier (assumption about the text)
+#   source words, lower case; "a|b" pairs with "x|y" in target; "#" = a number; "'s" = possessive
+#          a space matches a space, "-" matches a hyphen
+#   target replacement, or "=" to freeze the source as it is
+#   guards p+ / p- previous token is / is not in the list     n+ / n- next token
+#          s+ / s- the sentence contains / does not contain one of the words
+#          d-      the whole text does not contain one of the words
+#          list tokens: words, "#" number, "|" boundary (start, end, punctuation), "'s", "-"
+#          "title" = the first word must be Capitalised in the text
+
+# ---------------------------------------------------------------- spelling homographs
+# program -> programme, except the verb, and except when the text talks about computing
+S	program|programs	programme|programmes	p-:to,can,could,will,would,must,should,may,might,shall,cannot,i,you,we,they,he,she,who,computer,software;n-:code,files,crashes,crashed;d-:computer,computers,software,code,coding,app,apps,install,installed,installing,compile,compiled,compiler,bug,bugs,python,java,javascript,linux,windows,macos,unix,executable,script,scripts,programmer,programmers,programming,programmed,download,downloaded,algorithm,algorithms,cpu,debug,debugging,crash,crashed,crashes,terminal,api,function,functions,variable,variables,malware,antivirus,shell,kernel,binary,binaries,runtime,stdin,stdout,syntax,database,server,execute,executed,executes,executing,invoke,invoked,invokes,filename,filenames,directory,directories,parameter,parameters,user,users
+# tire -> tyre only when it is clearly the wheel
+S	tire	tyre	p+:a,the,flat,spare,car,rear,front,bike,bicycle,rubber,winter,summer,snow,new,old,worn,punctured,burst,left,right,back,this,that,my,your,his,her,our,their,each,every,one,truck,lorry,tractor,motorcycle
+S	tire	tyre	n+:pressure,pressures,iron,tread,treads,shop,change,swing,marks,tracks,size,wear,valve,pump,gauge,rotation,repair,manufacturer,manufacturers,industry,dealer,fitter,chains
+S	tires	tyres	p+:the,flat,spare,car,rear,front,bike,bicycle,rubber,winter,summer,snow,new,old,worn,punctured,four,two,both,all,these,those,my,your,his,her,our,their,its,truck,tractor,of,with,on,#
+# check -> cheque only in fixed money phrases
+S	by check	by cheque
+S	a check for	a cheque for	n+:#,$,£,€
+S	write a check|wrote a check|written a check|writing a check|writes a check	write a cheque|wrote a cheque|written a cheque|writing a cheque|writes a cheque
+S	cash a check|cashed a check|cashing a check|cash the check|cashed the check	cash a cheque|cashed a cheque|cashing a cheque|cash the cheque|cashed the cheque
+S	traveler's check|traveler's checks	traveller's cheque|traveller's cheques
+S	blank check	blank cheque
+# curb -> kerb (edge of the pavement), not "a curb on spending"
+S	curb|curbs	kerb|kerbs	p+:the,a;n-:on,of,to,in
+# story -> storey (level of a building)
+S	#-story	#-storey
+S	multi-story|single-story	multi-storey|single-storey
+S	# stories high|# stories tall	# storeys high|# storeys tall
+# meter -> metre (the unit), not the measuring device
+S	meter|meters	metre|metres	p+:#,per,square,cubic,half,few,several,many
+S	#-meter	#-metre
+S	meter	metre	p+:a,one,each,every;n+:away,long,wide,high,deep,tall,thick,from,above,below,apart,squared
+S	hundreds of meters|thousands of meters|dozens of meters|tens of meters	hundreds of metres|thousands of metres|dozens of metres|tens of metres
+# practice (verb) -> practise
+S	theory to practice|go to practice|went to practice	=
+S	practice	practise	p+:to,will,would,should,can,could,must,may,might,shall,cannot,i,you,we,they;n-:session,sessions,match,matches,room,rooms,exam,exams,test,tests
+S	practices	practises	p+:he,she,who,always,never,often,regularly,still
+# license (noun) -> licence
+S	license	licence	p+:a,the,my,your,his,her,our,their,its,this,that,driving,software,valid,no,any,each,every,under,without,marriage,fishing,hunting,business,gun,export,import,pilot,tv,television,open,commercial,free,new,same,one,poetic,artistic,trading,operating,full,provisional,'s
+S	licenses	licences	p+:the,these,those,their,our,software,driving,new,all,many,some,several,two,three,of,valid,#,issue,issued,grant,granted,revoke,revoked
+# draft -> draught
+S	draft beer|draft beers|draft ale|draft lager|draft horse|draft horses|on draft	draught beer|draught beers|draught ale|draught lager|draught horse|draught horses|on draught
+# names that keep their spelling in any dialect (the capital-letter guard already covers most uses)
+S	pearl harbor|world health organization|world trade organization|world trade center|rockefeller center|lincoln center|kennedy space center|department of defense|department of labor|labor day|medal of honor|secretary of defense	=
+
+# ---------------------------------------------------------------- vocabulary, safe tier
+V	truck|trucks	lorry|lorries	p-:pickup,pick,up,fire,food,monster,hand,tow,dump,garbage,ice,cream,no,any;n-:stop,stops,with
+V	elevator|elevators	lift|lifts	p-:grain;n-:pitch,pitches,music
+V	apartment building|apartment buildings|apartment block|apartment blocks	block of flats|blocks of flats|block of flats|blocks of flats
+V	apartment complex|apartment complexes|apartment hotel	=
+V	apartment|apartments	flat|flats
+V	sidewalk|sidewalks	pavement|pavements
+V	gasoline	petrol
+V	gas station|gas stations|gas pump|gas pumps|gas tank|gas tanks	petrol station|petrol stations|petrol pump|petrol pumps|petrol tank|petrol tanks
+V	vacation|vacations	holiday|holidays
+V	vacationer|vacationers|vacationing	holidaymaker|holidaymakers|holidaying
+V	cell phone|cell phones|cellphone|cellphones	mobile phone|mobile phones|mobile phone|mobile phones
+V	zip code|zip codes	postcode|postcodes
+V	parking lot|parking lots	car park|car parks
+V	parking garage|parking garages	multi-storey car park|multi-storey car parks
+V	diaper|diapers	nappy|nappies
+V	flashlight|flashlights	torch|torches
+V	faucet|faucets	tap|taps
+V	eggplant|eggplants	aubergine|aubergines
+V	zucchini|zucchinis	courgette|courgettes
+V	french fries	chips
+V	potato chips	crisps
+V	cotton candy	candy floss
+V	license plate|license plates	number plate|number plates
+V	driver's license|driver's licenses	driving licence|driving licences
+V	freeway|freeways	motorway|motorways
+V	crosswalk|crosswalks	zebra crossing|zebra crossings
+V	sneakers	trainers
+V	windshield|windshields	windscreen|windscreens
+V	turn signal|turn signals	indicator|indicators
+V	railroad|railroads	railway|railways
+V	mailman|mailmen	postman|postmen
+V	realtor|realtors	estate agent|estate agents
+V	drugstore|drugstores	pharmacy|pharmacies
+V	takeout	takeaway
+V	stroller|strollers	pushchair|pushchairs
+V	pacifier|pacifiers	dummy|dummies
+V	restroom|restrooms	toilet|toilets
+V	movie theater|movie theaters	cinema|cinemas
+V	mom|moms|mommy	mum|mums|mummy
+V	stand in line|standing in line|stood in line|wait in line|waiting in line|waited in line	queue|queuing|queued|queue|queuing|queued
+V	on the weekend|on weekends	at the weekend|at weekends
+V	in the fall	in the autumn	n-:of
+V	this fall|next fall	this autumn|next autumn
+V	last fall	last autumn	p-:his,her,my,your,their,our,the,a,that,this
+
+# ---------------------------------------------------------------- vocabulary, extended tier
+# only right if the text is not about American football
+X	soccer	football	s-:football,american
+X	soccer player|soccer players	footballer|footballers	s-:football,american
+# a roommate may share the room, not only the flat
+X	roommate|roommates	flatmate|flatmates
+X	candy	sweets	n-:bar,bars,cane,canes,floss,apple,apples,store,shop,crush
+X	trash can|trash cans|garbage can|garbage cans	rubbish bin|rubbish bins|rubbish bin|rubbish bins
