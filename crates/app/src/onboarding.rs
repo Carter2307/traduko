@@ -34,7 +34,7 @@ actions!(traduko_onboarding, [NextStep, CloseOnboarding]);
 
 pub const KEY_CONTEXT: &str = "TradukoOnboarding";
 
-/// The shell, without the transparent margin that holds its shadow.
+/// The shell, without the transparent margin around it.
 pub const SHELL_WIDTH: f32 = 440.0;
 pub const SHELL_HEIGHT: f32 = 640.0;
 
@@ -820,11 +820,9 @@ impl Render for Onboarding {
             .flex()
             .flex_col()
             .p(px(SHELL_PAD))
-            .bg(p.shell)
             .rounded(px(SHELL_RADIUS))
             .font_family(theme::SANS)
             .text_color(p.ink)
-            .shadow(theme::shell_shadow(&p))
             .child(header)
             .child(line)
             .child(div().flex().flex_col().flex_1().min_h_0().gap(px(8.)).child(hero).child(list).child(footer));
