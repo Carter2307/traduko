@@ -22,7 +22,7 @@ fn main() -> ExitCode {
         ("accurate", _) => ("Accurate set".to_string(), download_size(Quality::Accurate), install(models.clone(), Quality::Accurate)),
         (_, Some(language)) => (language.name().to_string(), language_download_size(language), install_language(models.clone(), language)),
         _ => {
-            let codes: Vec<&str> = languages().iter().map(|language| language.code().to_string().leak() as &str).collect();
+            let codes: Vec<String> = languages().iter().map(|language| language.code().to_string()).collect();
             eprintln!("usage: install light|accurate|LANGUAGE [MODELS_DIR]\nlanguages: {}", codes.join(" "));
             return ExitCode::from(2);
         }

@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use coco_engine::{Direction, EnglishVariant, Quality};
+use coco_engine::{Direction, EnglishVariant, Language, Quality};
 use serde::{Deserialize, Serialize};
 
 pub const APP_DIR: &str = "Coco";
@@ -38,7 +38,11 @@ pub struct Settings {
     /// Bottom-left corner of the mascot window, in screen points.
     pub mascot: Option<(f64, f64)>,
     pub mascot_size: MascotSize,
-    pub french_to_english: bool,
+    /// The languages of the last translation.
+    pub from: Language,
+    pub to: Language,
+    /// Coco works out the language of a text by itself. Off, it is `from`.
+    pub detect_language: bool,
     pub british: bool,
     pub accurate: bool,
     /// What the user wants. macOS holds the real state of the login item.
@@ -55,7 +59,9 @@ impl Default for Settings {
         Self {
             mascot: None,
             mascot_size: MascotSize::default(),
-            french_to_english: true,
+            from: Language::FRENCH,
+            to: Language::ENGLISH,
+            detect_language: true,
             british: false,
             accurate: true,
             // The mascot is meant to be there after a restart.
@@ -68,7 +74,7 @@ impl Default for Settings {
 
 impl Settings {
     pub fn direction(&self) -> Direction {
-        if self.french_to_english { Direction::FrToEn } else { Direction::EnToFr }
+        Direction::new(self.from, self.to)
     }
 
     pub fn english(&self) -> EnglishVariant {
@@ -122,6 +128,9 @@ mod tests {
         let settings = Settings {
             mascot: Some((120.0, 48.5)),
             mascot_size: MascotSize::Large,
+            from: Language::from_code("de").unwrap(),
+            to: Language::FRENCH,
+            detect_language: false,
             british: true,
             accurate: false,
             ..Settings::default()
@@ -152,6 +161,24 @@ mod tests {
         // Nor did it see the first screens: they are shown once.
         assert!(!settings.onboarded);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_file_written_when_there_were_two_languages_starts_from_french_to_english() {
+        let dir = std::env::temp_dir().join(format!("coco-settings-two-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(FILE), br#"{ "french_to_english": false, "british": true }"#).unwrap();
+        let settings = Settings::load(&dir);
+        // Which of the two it was does not matter: Coco reads it off the text.
+        assert_eq!(settings.direction(), Direction::new(Language::FRENCH, Language::ENGLISH));
+        assert!(settings.detect_language && settings.british);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_languages_are_saved_as_their_codes() {
+        let saved = serde_json::to_value(Settings::default()).unwrap();
+        assert_eq!((saved["from"].as_str(), saved["to"].as_str()), (Some("fr"), Some("en")));
     }
 
     #[test]

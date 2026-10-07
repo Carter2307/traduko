@@ -4,7 +4,7 @@
 use std::borrow::Cow;
 
 use gpui::{
-    App, BoxShadow, Div, FontWeight, Global, Hsla, SharedString, Stateful, WindowAppearance, div, point,
+    App, BoxShadow, Div, ElementId, FontWeight, Global, Hsla, SharedString, Stateful, WindowAppearance, div, point,
     prelude::*, px, rgb, rgba,
 };
 use gpui_component::{Theme, ThemeMode};
@@ -88,7 +88,7 @@ pub fn card(p: &Palette) -> Div {
 }
 
 /// A round control on the chip colour.
-pub fn chip(id: &'static str, p: &Palette) -> Stateful<Div> {
+pub fn chip(id: impl Into<ElementId>, p: &Palette) -> Stateful<Div> {
     let hover = p.chip_hover;
     div()
         .id(id)

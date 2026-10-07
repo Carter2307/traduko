@@ -1,6 +1,6 @@
 [package]
 name = "coco-engine"
-description = "Offline French and English translation: model, sentence pipeline and worker thread"
+description = "Offline translation with OPUS-MT models: model, sentence pipeline and worker thread"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

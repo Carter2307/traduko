@@ -1,7 +1,8 @@
 //! The first run, as three screens in one window: what Coco does, the model
 //! it needs, and the one thing macOS has to allow. A screen with nothing to
 //! ask is left out, and the screen of the models also opens alone, later, to
-//! add the other one.
+//! add the other one. So does a fourth screen, which is never part of the
+//! first run: the languages that can be added to French and English.
 //!
 //! The window is built like the panel: a shell that holds three cards. The
 //! top one is Coco itself, alive: it watches the pointer, thinks while a
@@ -13,8 +14,9 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use coco_blob::{CANVAS, Mascot, Mood};
-use coco_engine::{InstallUpdate, Quality, download_size, install};
+use coco_engine::{Direction, InstallUpdate, Installed, Language, Quality, download_size, install, install_language, language_download_size, languages};
 use futures::StreamExt as _;
+use futures::channel::mpsc::UnboundedReceiver;
 use gpui::{
     Animation, AnimationExt as _, AnyElement, App, Bounds, Context, Div, EventEmitter, FocusHandle, Focusable,
     FontWeight, Hsla, MouseButton, Pixels, SharedString, Stateful, Task, Window, actions, canvas, div, ease_in_out,
@@ -44,6 +46,8 @@ const ASK_AGAIN: Duration = Duration::from_millis(1500);
 pub enum Step {
     Welcome,
     Models,
+    /// The languages to add. Only opened alone, from the panel.
+    Languages,
     Login,
 }
 
@@ -61,7 +65,7 @@ pub fn steps(first_run: bool, permission: Permission) -> Vec<Step> {
 pub enum OnboardingEvent {
     /// Coco's mood changed here: the mascot on the desktop follows.
     Mood(Mood),
-    /// A model set is on disk now.
+    /// A model set or a language is on disk now.
     ModelInstalled,
     /// The user asked for the login item, and this is what macOS did.
     LoginChanged(login::Outcome),
@@ -77,8 +81,44 @@ pub struct OnboardingOptions {
     /// The screens to go through, in order.
     pub steps: Vec<Step>,
     pub models_dir: PathBuf,
-    pub installed: Vec<Quality>,
+    pub installed: Installed,
     pub permission: Permission,
+}
+
+/// What a line of the lists downloads.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Pack {
+    /// French and English, both ways, in one quality.
+    Set(Quality),
+    /// Another language, to English and from it.
+    Language(Language),
+}
+
+impl Pack {
+    /// How much there is to download, in bytes.
+    fn size(self) -> u64 {
+        match self {
+            Pack::Set(quality) => download_size(quality),
+            Pack::Language(language) => language_download_size(language),
+        }
+    }
+
+    fn install(self, models_dir: PathBuf) -> UnboundedReceiver<InstallUpdate> {
+        match self {
+            Pack::Set(quality) => install(models_dir, quality),
+            Pack::Language(language) => install_language(models_dir, language),
+        }
+    }
+
+    fn is_among(self, installed: &Installed) -> bool {
+        match self {
+            Pack::Set(quality) => installed.sets().contains(&quality),
+            Pack::Language(language) => {
+                let to_english = Direction::new(language, Language::ENGLISH);
+                installed.translates(to_english) && installed.translates(to_english.swapped())
+            }
+        }
+    }
 }
 
 #[derive(Clone, PartialEq)]
@@ -92,7 +132,7 @@ enum Fetching {
 }
 
 struct Model {
-    quality: Quality,
+    pack: Pack,
     state: Fetching,
     /// The download, while it runs. Dropping it stops it; what is on disk
     /// stays, and the next download goes on from there.
@@ -107,7 +147,8 @@ pub struct Onboarding {
     /// screen, 0 to 1: it travels from there.
     line_from: f32,
     models_dir: PathBuf,
-    models: [Model; 2],
+    /// The two sets, then the languages.
+    models: Vec<Model>,
     permission: Permission,
     /// The user pressed Allow.
     asked: bool,
@@ -131,11 +172,11 @@ impl Focusable for Onboarding {
 
 impl Onboarding {
     pub fn new(options: OnboardingOptions, cx: &mut Context<Self>) -> Self {
-        let model = |quality| Model {
-            quality,
-            state: if options.installed.contains(&quality) { Fetching::Installed } else { Fetching::No },
-            job: None,
-        };
+        let model = |pack: Pack| Model { pack, state: if pack.is_among(&options.installed) { Fetching::Installed } else { Fetching::No }, job: None };
+        // The better set first: it is the one to take without a reason to
+        // take the other.
+        let sets = [Pack::Set(Quality::Accurate), Pack::Set(Quality::Light)];
+        let models = sets.into_iter().chain(languages().into_iter().map(Pack::Language)).map(model).collect();
         let mut mascot = Mascot::new(Mood::Idle);
         mascot.enter();
 
@@ -145,9 +186,7 @@ impl Onboarding {
             at: 0,
             line_from: 0.0,
             models_dir: options.models_dir,
-            // The better one first: it is the one to take without a reason
-            // to take the other.
-            models: [model(Quality::Accurate), model(Quality::Light)],
+            models,
             permission: Permission::Unavailable,
             asked: false,
             asking: false,
@@ -179,8 +218,8 @@ impl Onboarding {
         if self.steps.len() < 2 { 0.0 } else { (self.at + 1) as f32 / self.steps.len() as f32 }
     }
 
-    fn model(&mut self, quality: Quality) -> &mut Model {
-        let at = self.models.iter().position(|model| model.quality == quality).unwrap_or(0);
+    fn model(&mut self, pack: Pack) -> &mut Model {
+        let at = self.models.iter().position(|model| model.pack == pack).unwrap_or(0);
         &mut self.models[at]
     }
 
@@ -223,33 +262,33 @@ impl Onboarding {
 
     // ---- the models ---------------------------------------------------------
 
-    fn download(&mut self, quality: Quality, cx: &mut Context<Self>) {
-        if !matches!(self.model(quality).state, Fetching::No | Fetching::Failed(_)) {
+    fn download(&mut self, pack: Pack, cx: &mut Context<Self>) {
+        if !matches!(self.model(pack).state, Fetching::No | Fetching::Failed(_)) {
             return;
         }
-        let mut updates = install(self.models_dir.clone(), quality);
+        let mut updates = pack.install(self.models_dir.clone());
         let job = cx.spawn(async move |this, cx| {
             let mut finished = false;
             while let Some(update) = updates.next().await {
                 finished = matches!(update, InstallUpdate::Done | InstallUpdate::Failed(_));
-                if this.update(cx, |this, cx| this.apply(quality, update, cx)).is_err() {
+                if this.update(cx, |this, cx| this.apply(pack, update, cx)).is_err() {
                     return;
                 }
             }
             // A stream that just ends means the download died on its own.
             if !finished {
                 let stopped = InstallUpdate::Failed("The download stopped. Try again.".into());
-                this.update(cx, |this, cx| this.apply(quality, stopped, cx)).ok();
+                this.update(cx, |this, cx| this.apply(pack, stopped, cx)).ok();
             }
         });
-        let model = self.model(quality);
-        model.state = Fetching::Downloading { done: 0, total: download_size(quality) };
+        let model = self.model(pack);
+        model.state = Fetching::Downloading { done: 0, total: pack.size() };
         model.job = Some(job);
         cx.notify();
     }
 
-    fn stop(&mut self, quality: Quality, cx: &mut Context<Self>) {
-        let model = self.model(quality);
+    fn stop(&mut self, pack: Pack, cx: &mut Context<Self>) {
+        let model = self.model(pack);
         // The last update may have come while the pointer went down.
         if matches!(model.state, Fetching::Downloading { .. } | Fetching::Checking) {
             model.job = None;
@@ -258,8 +297,8 @@ impl Onboarding {
         }
     }
 
-    fn apply(&mut self, quality: Quality, update: InstallUpdate, cx: &mut Context<Self>) {
-        let model = self.model(quality);
+    fn apply(&mut self, pack: Pack, update: InstallUpdate, cx: &mut Context<Self>) {
+        let model = self.model(pack);
         match update {
             InstallUpdate::Downloading { done, total } => model.state = Fetching::Downloading { done, total },
             InstallUpdate::Checking => model.state = Fetching::Checking,
@@ -470,15 +509,15 @@ fn settled(text: &'static str, p: &Palette) -> AnyElement {
 }
 
 /// The lines of a list, with a hairline between two of them.
-fn list(rows: Vec<Div>, p: &Palette) -> Div {
-    let mut list = card(p).flex().flex_col();
+fn lines(rows: Vec<Div>, p: &Palette) -> Div {
+    let mut lines = div().flex().flex_col();
     for (at, row) in rows.into_iter().enumerate() {
         if at > 0 {
-            list = list.child(div().h(px(1.)).bg(p.line.opacity(0.6)));
+            lines = lines.child(div().h(px(1.)).bg(p.line.opacity(0.6)));
         }
-        list = list.child(row);
+        lines = lines.child(row);
     }
-    list
+    lines
 }
 
 fn megabytes(bytes: u64) -> u64 {
@@ -489,43 +528,51 @@ impl Onboarding {
     fn features(&self, p: &Palette) -> Vec<Div> {
         let feature = |icon, tint, name: &'static str, about: &'static str| row(tile(icon, tint), title(name, p), detail(about, p.muted), None);
         vec![
-            feature(IconName::Languages, Tint::Orange, "Translation as you type", "Write in French or English: I work out which."),
+            feature(IconName::Languages, Tint::Orange, "Translation as you type", "Write in a language I have: I work out which."),
             feature(IconName::ShieldCheck, Tint::Blue, "Nothing leaves this Mac", "The model runs here. No account, no network."),
             feature(IconName::SpellCheck, Tint::Violet, "American or British", "Color or colour, truck or lorry: you choose."),
             feature(IconName::MousePointerClick, Tint::Green, "Always on your desktop", "Click me to translate, drag me out of the way."),
         ]
     }
 
-    fn model_row(&self, quality: Quality, p: &Palette, cx: &mut Context<Self>) -> Div {
-        let (name, about, icon, tint) = match quality {
-            Quality::Accurate => ("Accurate", "The most faithful translations.", IconName::Sparkles, Tint::Orange),
-            Quality::Light => ("Light", "Smaller and quicker to download.", IconName::Feather, Tint::Blue),
+    /// The lines of the languages, in the order of the engine's table.
+    fn language_rows(&self, p: &Palette, cx: &mut Context<Self>) -> Vec<Div> {
+        let languages: Vec<Pack> = self.models.iter().map(|model| model.pack).filter(|pack| matches!(pack, Pack::Language(_))).collect();
+        languages.into_iter().map(|pack| self.model_row(pack, p, cx)).collect()
+    }
+
+    fn model_row(&self, pack: Pack, p: &Palette, cx: &mut Context<Self>) -> Div {
+        // Its place in the list tells its controls from those of the others.
+        let at = self.models.iter().position(|model| model.pack == pack).unwrap_or(0);
+        let (name, about, icon, tint): (SharedString, SharedString, IconName, Tint) = match pack {
+            Pack::Set(Quality::Accurate) => ("Accurate".into(), "The most faithful translations.".into(), IconName::Sparkles, Tint::Orange),
+            Pack::Set(Quality::Light) => ("Light".into(), "Smaller and quicker to download.".into(), IconName::Feather, Tint::Blue),
+            Pack::Language(language) => {
+                let tints = [Tint::Blue, Tint::Violet, Tint::Green, Tint::Orange];
+                (language.native_name().to_string().into(), format!("{}, to English and back.", language.name()).into(), IconName::Languages, tints[at % tints.len()])
+            }
         };
-        let ids: [&'static str; 2] = match quality {
-            Quality::Accurate => ["get-accurate", "stop-accurate"],
-            Quality::Light => ["get-light", "stop-light"],
-        };
-        let state = self.models.iter().find(|model| model.quality == quality).map_or(Fetching::No, |model| model.state.clone());
+        let state = self.models[at].state.clone();
 
         let get = |label: &'static str, cx: &mut Context<Self>| {
-            chip(ids[0], p).flex_none().px(px(14.)).on_click(cx.listener(move |this, _, _, cx| this.download(quality, cx))).child(label).into_any_element()
+            chip(("get", at), p).flex_none().px(px(14.)).on_click(cx.listener(move |this, _, _, cx| this.download(pack, cx))).child(label).into_any_element()
         };
         let stop = |cx: &mut Context<Self>| {
-            chip(ids[1], p)
+            chip(("stop", at), p)
                 .flex_none()
                 .w(px(32.))
-                .on_click(cx.listener(move |this, _, _, cx| this.stop(quality, cx)))
+                .on_click(cx.listener(move |this, _, _, cx| this.stop(pack, cx)))
                 .child(Icon::new(IconName::X).size(px(14.)))
                 .into_any_element()
         };
         // Three lines whatever the state, so that nothing jumps when a
         // download starts or ends: the name, a sentence or the bar that
         // stands in for it, and a line of numbers.
-        let sentence = |color: Hsla| detail(about, color).into_any_element();
+        let sentence = |color: Hsla| detail(about.clone(), color).into_any_element();
         let numbers = |text: String| div().font_family(MONO).text_size(px(12.)).line_height(px(18.)).text_color(p.muted).child(text).into_any_element();
         let bar = |fill: AnyElement| div().h(px(18.)).flex().items_center().child(div().w_full().h(px(3.)).rounded_full().bg(p.line).overflow_hidden().child(fill)).into_any_element();
 
-        let size = megabytes(download_size(quality));
+        let size = megabytes(pack.size());
         let (middle, lower, control): (AnyElement, AnyElement, AnyElement) = match state {
             Fetching::No => (sentence(p.muted), numbers(format!("{size} MB")), get("Download", cx)),
             Fetching::Installed => (sentence(p.muted), numbers("On this Mac".into()), settled("Installed", p)),
@@ -542,7 +589,7 @@ impl Onboarding {
                     .w(relative(0.3))
                     .rounded_full()
                     .bg(p.primary)
-                    .with_animation(ids[0], Animation::new(Duration::from_millis(1100)).repeat().with_easing(ease_in_out), |segment, t| {
+                    .with_animation(("checking", at), Animation::new(Duration::from_millis(1100)).repeat().with_easing(ease_in_out), |segment, t| {
                         segment.ml(relative(t * 0.7))
                     })
                     .into_any_element();
@@ -562,7 +609,7 @@ impl Onboarding {
             .font_weight(FontWeight::MEDIUM)
             .text_color(p.primary)
             .child("Recommended");
-        let heading = div().flex().items_center().gap(px(8.)).child(title(name, p)).when(quality == Quality::Accurate, |heading| heading.child(recommended));
+        let heading = div().flex().items_center().gap(px(8.)).child(title(name, p)).when(pack == Pack::Set(Quality::Accurate), |heading| heading.child(recommended));
         row(tile(icon, tint), heading, lower, Some(control))
     }
 
@@ -668,8 +715,9 @@ impl Render for Onboarding {
 
         // ---- Coco, and what this screen is about -------------------------------------
         let (headline, about): (&str, &str) = match step {
-            Step::Welcome => ("Bonjour, I'm Coco", "I translate between French and English, right here on your desktop."),
-            Step::Models => ("Download a model", "A model does the translating. It comes from Hugging Face once, then I work offline."),
+            Step::Welcome => ("Bonjour, I'm Coco", "I translate as you type, right here on your desktop."),
+            Step::Models => ("Download a model", "A model does the translating: these two know French and English. It comes from Hugging Face once, then I work offline."),
+            Step::Languages => ("Add a language", "Each one is two small models, to English and from it. Between two of them, I go through English."),
             Step::Login => ("Keep me around", "With your permission I open by myself when you log in, so I'm here after a restart."),
         };
         let (frame, seen) = (self.mascot.frame(), self.hero.clone());
@@ -682,12 +730,18 @@ impl Render for Onboarding {
         )
         .flex_none()
         // More room on the screens with a shorter list.
-        .size(px(if step == Step::Welcome { 100. } else { 124. }));
+        .size(px(match step {
+            Step::Welcome => 100.,
+            Step::Languages => 84.,
+            Step::Models | Step::Login => 124.,
+        }));
+        // The languages are more than the window is tall: their list takes
+        // the room and scrolls, and Coco keeps to what it needs.
+        let scrolls = step == Step::Languages;
         let hero = card(&p)
             .flex()
             .flex_col()
-            .flex_1()
-            .min_h_0()
+            .map(|hero| if scrolls { hero.flex_none().pt(px(4.)) } else { hero.flex_1().min_h_0() })
             .items_center()
             .justify_center()
             .px(px(28.))
@@ -701,8 +755,14 @@ impl Render for Onboarding {
         // ---- the list ----------------------------------------------------------------------
         let rows = match step {
             Step::Welcome => self.features(&p),
-            Step::Models => vec![self.model_row(Quality::Accurate, &p, cx), self.model_row(Quality::Light, &p, cx)],
+            Step::Models => vec![self.model_row(Pack::Set(Quality::Accurate), &p, cx), self.model_row(Pack::Set(Quality::Light), &p, cx)],
+            Step::Languages => self.language_rows(&p, cx),
             Step::Login => self.login_rows(&p, cx),
+        };
+        let list = if scrolls {
+            card(&p).id("languages").flex_1().min_h_0().overflow_y_scroll().child(lines(rows, &p)).into_any_element()
+        } else {
+            card(&p).flex_none().child(lines(rows, &p)).into_any_element()
         };
 
         // ---- footer: back, and the way on ---------------------------------------------------
@@ -782,7 +842,7 @@ impl Render for Onboarding {
             .shadow(theme::shell_shadow(&p))
             .child(header)
             .child(line)
-            .child(div().flex().flex_col().flex_1().min_h_0().gap(px(8.)).child(hero).child(list(rows, &p).flex_none()).child(footer));
+            .child(div().flex().flex_col().flex_1().min_h_0().gap(px(8.)).child(hero).child(list).child(footer));
 
         div().size_full().flex().items_center().justify_center().child(shell)
     }

@@ -1,25 +1,29 @@
 //! The translator panel: a rounded shell that holds three cards (source,
 //! result, footer). Translation starts by itself a moment after typing stops.
+//!
+//! Each of the two text cards names its language, and that name is a menu
+//! of the languages that have a model. The top one can also be left to
+//! Coco, which then reads the language off the text.
 
 use std::time::Duration;
 
 use coco_blob::{Frame, Mascot, Mood};
-use coco_engine::{Direction, EnglishVariant, Quality, Request, Translator, Update};
+use coco_engine::{Direction, EnglishVariant, Installed, Language, Quality, Request, Translator, Update};
 use futures::StreamExt as _;
 use gpui::{
     Animation, AnimationExt as _, App, ClipboardItem, Context, Entity, EventEmitter, FocusHandle, Focusable,
-    FontWeight, MouseButton, SharedString, Subscription, Task, Window, actions, canvas, div, ease_in_out,
-    prelude::*, px, relative,
+    FontWeight, Hsla, MouseButton, SharedString, Subscription, Task, WeakEntity, Window, actions, canvas, div,
+    ease_in_out, prelude::*, px, relative,
 };
 use gpui_component::{
     Icon, Sizable as _,
     button::{Button, ButtonVariants as _},
     input::{InputEvent, Textarea, TextareaState},
-    menu::DropdownMenu as _,
+    menu::{DropdownMenu as _, PopupMenu, PopupMenuItem},
 };
 use gpui_kit_assets::IconName;
 
-use crate::detect::{self, Language};
+use crate::detect;
 use crate::mascot_view;
 use crate::settings::MascotSize;
 use crate::theme::{self, MONO, SHELL_PAD, SHELL_RADIUS, card, chip, grip, micro};
@@ -62,12 +66,14 @@ pub enum PanelEvent {
     /// The result went to the clipboard.
     Copied,
     HideRequested,
-    /// The direction, the English variant or the model changed.
+    /// The languages, the English variant or the model changed.
     PreferencesChanged,
     MascotSizeChanged(MascotSize),
     OpenAtLoginChanged(bool),
     /// The user wants to download a model.
     ModelsRequested,
+    /// The user wants a language that is not in the menus.
+    LanguagesRequested,
     QuitRequested,
 }
 
@@ -87,12 +93,15 @@ pub struct Panel {
     source: Entity<TextareaState>,
     result: Entity<TextareaState>,
     direction: Direction,
+    /// Coco reads the language off the text. Off when the user chose the
+    /// language to translate from.
+    detect: bool,
     /// Set when the user swapped the languages by hand: Coco then stops
     /// choosing the direction itself until the text is cleared.
     direction_pinned: bool,
     english: EnglishVariant,
     quality: Quality,
-    installed: Vec<Quality>,
+    installed: Installed,
     mascot_size: MascotSize,
     open_at_login: bool,
     phase: Phase,
@@ -116,16 +125,19 @@ impl Focusable for Panel {
 
 pub struct PanelOptions {
     pub direction: Direction,
+    pub detect: bool,
     pub english: EnglishVariant,
     pub quality: Quality,
-    pub installed: Vec<Quality>,
+    pub installed: Installed,
     pub mascot_size: MascotSize,
     pub open_at_login: bool,
 }
 
 impl Panel {
     pub fn new(translator: Translator, options: PanelOptions, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let source = cx.new(|cx| TextareaState::new(window, cx).placeholder(source_placeholder(options.direction)));
+        // The languages of the last run may have left the disk since.
+        let direction = servable(&options.installed, options.direction);
+        let source = cx.new(|cx| TextareaState::new(window, cx).placeholder(source_placeholder(direction.from)));
         let result = cx.new(|cx| TextareaState::new(window, cx));
 
         let focus = cx.focus_handle();
@@ -145,7 +157,8 @@ impl Panel {
             focus,
             source,
             result,
-            direction: options.direction,
+            direction,
+            detect: options.detect,
             direction_pinned: false,
             english: options.english,
             quality: options.quality,
@@ -166,6 +179,11 @@ impl Panel {
         self.direction
     }
 
+    /// True when Coco reads the language off the text.
+    pub fn detects(&self) -> bool {
+        self.detect
+    }
+
     pub fn english(&self) -> EnglishVariant {
         self.english
     }
@@ -174,9 +192,10 @@ impl Panel {
         self.quality
     }
 
-    /// A model was downloaded: it joins the menu, and `quality` is the one
-    /// to use now.
-    pub fn set_installed(&mut self, installed: Vec<Quality>, quality: Quality, cx: &mut Context<Self>) {
+    /// Models were downloaded: they join the menus, and `quality` is the
+    /// one to use now.
+    pub fn set_installed(&mut self, installed: Installed, quality: Quality, cx: &mut Context<Self>) {
+        self.direction = servable(&installed, self.direction);
         self.installed = installed;
         self.quality = quality;
         cx.notify();
@@ -230,16 +249,14 @@ impl Panel {
         }
 
         // Typing English while the panel says French: follow the text.
-        let written_in = match detect::language(&text) {
-            Some(Language::French) => Some(Direction::FrToEn),
-            Some(Language::English) => Some(Direction::EnToFr),
-            None => None,
-        };
-        if let Some(direction) = written_in
-            && direction != self.direction
+        if self.detect
             && !self.direction_pinned
+            && let Some(written_in) = detect::language(&text, &self.installed.languages())
         {
-            self.set_direction(direction, window, cx);
+            let direction = reading(written_in, self.direction);
+            if direction != self.direction {
+                self.set_direction(direction, window, cx);
+            }
         }
 
         let mut updates = self.translator.translate(Request {
@@ -305,9 +322,36 @@ impl Panel {
 
     fn set_direction(&mut self, direction: Direction, window: &mut Window, cx: &mut Context<Self>) {
         self.direction = direction;
-        let placeholder = source_placeholder(direction);
+        let placeholder = source_placeholder(direction.from);
         self.source.update(cx, |state, cx| state.set_placeholder(placeholder, window, cx));
         cx.emit(PanelEvent::PreferencesChanged);
+    }
+
+    /// The language to translate from: one that the user picked, or `None`
+    /// to let Coco read it off the text.
+    fn choose_source(&mut self, language: Option<Language>, window: &mut Window, cx: &mut Context<Self>) {
+        self.detect = language.is_none();
+        self.direction_pinned = false;
+        let direction = language.map_or(self.direction, |language| reading(language, self.direction));
+        self.set_direction(direction, window, cx);
+        self.translate_now(window, cx);
+    }
+
+    /// The language to translate to.
+    fn choose_target(&mut self, language: Language, window: &mut Window, cx: &mut Context<Self>) {
+        // To the language it is read in: the two change places.
+        let direction = if language == self.direction.from { self.direction.swapped() } else { Direction::new(self.direction.from, language) };
+        if direction != self.direction {
+            self.set_direction(direction, window, cx);
+            self.translate_now(window, cx);
+        }
+    }
+
+    /// The languages of the menus, in the order of their own names.
+    fn languages(&self) -> Vec<Language> {
+        let mut languages = self.installed.languages();
+        languages.sort_by_key(|language| language.native_name().to_lowercase());
+        languages
     }
 
     /// Swaps the languages and the texts, like every translator does.
@@ -338,7 +382,7 @@ impl Panel {
     }
 
     fn set_quality(&mut self, quality: Quality, window: &mut Window, cx: &mut Context<Self>) {
-        if self.quality != quality && self.installed.contains(&quality) {
+        if self.quality != quality && self.installed.qualities().contains(&quality) {
             self.quality = quality;
             cx.emit(PanelEvent::PreferencesChanged);
             self.translate_now(window, cx);
@@ -403,29 +447,63 @@ enum StatusDot {
     Ok,
 }
 
-fn source_placeholder(direction: Direction) -> &'static str {
-    match direction {
-        Direction::FrToEn => "Écrivez ou collez du texte…",
-        Direction::EnToFr => "Type or paste some text…",
+/// The invitation to type, in the language that is expected.
+fn source_placeholder(language: Language) -> &'static str {
+    match language.code() {
+        "fr" => "Écrivez ou collez du texte…",
+        "es" => "Escribe o pega un texto…",
+        "de" => "Text eingeben oder einfügen…",
+        _ => "Type or paste some text…",
     }
 }
 
-fn language_names(direction: Direction, english: EnglishVariant) -> (&'static str, &'static str) {
-    let english = match english {
-        EnglishVariant::American => "English · US",
-        EnglishVariant::British => "English · UK",
-    };
-    match direction {
-        Direction::FrToEn => ("Français", english),
-        Direction::EnToFr => ("English", "Français"),
+/// The direction once a text is known to be in `language`: from it, to the
+/// language that was asked for. A text that is already in that one goes the
+/// other way, as when the two languages are swapped.
+fn reading(language: Language, direction: Direction) -> Direction {
+    if language == direction.to { direction.swapped() } else { Direction::new(language, direction.to) }
+}
+
+/// `wanted` when the models on disk can translate it, else a direction that
+/// they can: French to English when it is there.
+fn servable(installed: &Installed, wanted: Direction) -> Direction {
+    if installed.translates(wanted) {
+        return wanted;
     }
+    let languages = installed.languages();
+    let all = languages.iter().flat_map(|from| languages.iter().map(move |to| Direction::new(*from, *to)));
+    let usual = Direction::new(Language::FRENCH, Language::ENGLISH);
+    std::iter::once(usual).chain(all).find(|direction| installed.translates(*direction)).unwrap_or(wanted)
+}
+
+/// The name of a language over its card, as a menu of the others.
+fn language_menu(
+    id: &'static str,
+    label: String,
+    color: Hsla,
+    items: impl Fn(PopupMenu) -> PopupMenu + 'static,
+) -> impl IntoElement {
+    Button::new(id).ghost().small().child(micro(label.to_uppercase(), color)).dropdown_caret(true).dropdown_menu(move |menu, _, _| items(menu.min_w(px(200.))))
+}
+
+/// A line of a menu of languages, which does `chosen` to the panel.
+fn language_item(
+    label: impl Into<SharedString>,
+    checked: bool,
+    panel: &WeakEntity<Panel>,
+    chosen: impl Fn(&mut Panel, &mut Window, &mut Context<Panel>) + 'static,
+) -> PopupMenuItem {
+    let panel = panel.clone();
+    PopupMenuItem::new(label).checked(checked).on_click(move |_, window, cx| {
+        panel.update(cx, |panel, cx| chosen(panel, window, cx)).ok();
+    })
 }
 
 impl Render for Panel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = theme::palette(cx);
         let (status, dot) = self.status();
-        let (from, to) = language_names(self.direction, self.english);
+        let Direction { from, to } = self.direction;
         let has_result = self.result.read(cx).text().len() > 0;
         let words = self.source_text(cx).split_whitespace().count();
 
@@ -475,6 +553,41 @@ impl Render for Panel {
             ),
         };
 
+        // ---- the two languages, each a menu ------------------------------------------
+        let (languages, detect, panel) = (self.languages(), self.detect, cx.entity().downgrade());
+        let more = |menu: PopupMenu, panel: &WeakEntity<Self>| {
+            menu.separator().item(language_item("More languages…", false, panel, |_, _, cx| cx.emit(PanelEvent::LanguagesRequested)))
+        };
+        let source_label = if detect { format!("{} · auto", from.native_name()) } else { from.native_name().to_string() };
+        let source_language = language_menu("source-language", source_label, p.muted, {
+            let (languages, panel) = (languages.clone(), panel.clone());
+            move |menu| {
+                let menu = menu.item(language_item("Detect language", detect, &panel, |panel, window, cx| panel.choose_source(None, window, cx))).separator();
+                let menu = languages.iter().fold(menu, |menu, language| {
+                    let language = *language;
+                    let checked = !detect && language == from;
+                    menu.item(language_item(language.native_name().to_string(), checked, &panel, move |panel, window, cx| {
+                        panel.choose_source(Some(language), window, cx)
+                    }))
+                });
+                more(menu, &panel)
+            }
+        });
+        let target_label = match (to == Language::ENGLISH, self.english) {
+            (true, EnglishVariant::American) => "English · US".to_string(),
+            (true, EnglishVariant::British) => "English · UK".to_string(),
+            (false, _) => to.native_name().to_string(),
+        };
+        let target_language = language_menu("target-language", target_label, p.primary, move |menu| {
+            let menu = languages.iter().fold(menu, |menu, language| {
+                let language = *language;
+                menu.item(language_item(language.native_name().to_string(), language == to, &panel, move |panel, window, cx| {
+                    panel.choose_target(language, window, cx)
+                }))
+            });
+            more(menu, &panel)
+        });
+
         // ---- source card -----------------------------------------------------------
         let swap_hover = p.chip_hover;
         let source = card(&p)
@@ -486,10 +599,10 @@ impl Render for Panel {
                     .flex()
                     .items_center()
                     .justify_between()
-                    .pl(px(18.))
+                    .pl(px(10.))
                     .pr(px(12.))
                     .pt(px(12.))
-                    .child(micro(from.to_uppercase(), p.muted))
+                    .child(source_language)
                     .child(
                         div()
                             .id("swap")
@@ -541,16 +654,18 @@ impl Render for Panel {
                     .child(div().text_size(px(15.5)).font_weight(FontWeight::MEDIUM).text_color(p.ink).child(headline))
                     .child(div().text_size(px(13.5)).text_color(p.muted).child(detail)),
             );
+        // The language stays over the card when it is empty: it is where
+        // the user says what to translate to, before typing.
         let result = card(&p)
             .flex()
             .flex_col()
             .h(px(176.))
+            .child(div().flex_none().pl(px(10.)).pt(px(12.)).child(div().flex().items_center().h(px(28.)).child(target_language)))
             .when(has_result, |card| {
-                card.child(div().pl(px(18.)).pt(px(12.)).child(div().flex().items_center().h(px(28.)).child(micro(to.to_uppercase(), p.primary)))).child(
-                    div().flex_1().min_h_0().px(px(8.)).pb(px(8.)).child(Textarea::new(&self.result).readonly(true).appearance(false).h_full()),
-                )
+                card.child(div().flex_1().min_h_0().px(px(8.)).pb(px(8.)).child(Textarea::new(&self.result).readonly(true).appearance(false).h_full()))
             })
-            .when(!has_result, |card| card.child(empty));
+            // As much room under the words as the language takes above them.
+            .when(!has_result, |card| card.child(div().flex_1().min_h_0().pb(px(40.)).child(empty)));
 
         // ---- footer card: English variant, options, numbers, actions -----------------------
         let english_tab = |label: &'static str, variant: EnglishVariant, this: &Self| {
@@ -573,7 +688,23 @@ impl Render for Panel {
                 .child(div().h(px(2.)).rounded_full().bg(if active { p.primary } else { gpui::transparent_black() }))
         };
 
-        let (quality, installed, open_at_login) = (self.quality, self.installed.clone(), self.open_at_login);
+        // British or American is a question for English only. Another
+        // language has nothing to choose here, and one that is reached
+        // through English says so: two translations, twice the mistakes.
+        let footer_left = if to == Language::ENGLISH {
+            div()
+                .flex()
+                .items_center()
+                .gap(px(18.))
+                .child(english_tab("American", EnglishVariant::American, self))
+                .child(english_tab("British", EnglishVariant::British, self))
+        } else if self.installed.goes_through_english(self.direction) {
+            div().text_size(px(13.5)).text_color(p.muted).child("Translated through English")
+        } else {
+            div()
+        };
+
+        let (quality, installed, open_at_login) = (self.quality, self.installed.qualities(), self.open_at_login);
         let mascot_size = self.mascot_size;
         let focus = self.focus.clone();
         let options = Button::new("options")
@@ -621,14 +752,7 @@ impl Render for Panel {
                     .h(px(46.))
                     .pl(px(18.))
                     .pr(px(10.))
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(18.))
-                            .child(english_tab("American", EnglishVariant::American, self))
-                            .child(english_tab("British", EnglishVariant::British, self)),
-                    )
+                    .child(footer_left)
                     .child(options),
             )
             .child(div().h(px(1.)).bg(p.line.opacity(0.6)))

@@ -1,12 +1,16 @@
 # Coco
 
-A French and English translator that lives on the desktop. Coco is a small
-mascot that floats over your windows; click it and a translator panel opens
-beside it. Translation runs on this Mac, with no network.
+A translator that lives on the desktop. Coco is a small mascot that floats
+over your windows; click it and a translator panel opens beside it.
+Translation runs on this Mac, with no network.
 
-- **French to English and English to French**, as you type.
+- **French and English to start with**, as you type, and the languages you
+  add: Spanish, German, Italian, Dutch, Russian, Swedish, Ukrainian, Hindi,
+  Danish, Finnish, Czech, Hungarian, Indonesian.
+- **The language is detected**: write in any language that is installed and
+  Coco works out which one it is.
 - **American or British English** for the English side.
-- **Two models**: a light one and a more accurate one.
+- **Two models** for French and English: a light one and a more accurate one.
 - **Comes back after a restart**: Coco opens at login, once you allow it.
 
 ## Install
@@ -26,6 +30,24 @@ when there is nothing to allow. `install.sh` has fetched the models already,
 so the second screen finds them; a copy of the app that came without them
 downloads them there, from Hugging Face, with the `curl` of macOS.
 
+### More languages
+
+A language is two small models, to English and from it (about 300 MB on
+disk, twice that to download). Add one from the panel, with **More
+languages…** in either language menu, or from a terminal:
+
+```bash
+scripts/fetch-models.sh --lang es,de
+```
+
+`scripts/fetch-models.sh --list` gives the codes. Between two languages
+that are not English (French to German, Spanish to French) Coco translates
+through English: two translations, so a little slower and a little less
+exact. Spanish and German have been run and their installed weights are
+pinned by SHA-256; the other languages are pinned as downloaded and record
+their installed SHA-256 the first time they are fetched (see the table in
+`scripts/fetch-models.sh`).
+
 To remove everything (dry run first, then `--yes`):
 
 ```bash
@@ -39,8 +61,10 @@ scripts/uninstall.sh
 | Click Coco | Open or close the panel |
 | Drag Coco | Move it; the place is remembered |
 | Type or paste in the top card | The translation, a moment after you stop |
+| The language over the top card | Choose the language to read, or **Detect language** to let Coco tell (the default) |
+| The language over the bottom card | Choose the language to translate to |
 | The arrows in the top card, or ⌘⇧S | Swap the languages |
-| American / British | Choose the English you want |
+| American / British | Choose the English you want, when translating to English |
 | Light / Accurate | Choose the model and Coco's size (small, medium, large), download the other model, open at login, quit |
 | ⌘⇧C, or Copy | Copy the translation |
 | Esc, or × | Close the panel |
@@ -56,10 +80,18 @@ scripts/uninstall.sh
 | `crates/login` | Open at login, one running copy, bundle paths |
 
 The models are [OPUS-MT](https://github.com/Helsinki-NLP/Opus-MT) from
-Helsinki-NLP on Hugging Face (`opus-mt-fr-en`, `opus-mt-en-fr` and their
-`tc-big` versions), run with [candle](https://github.com/huggingface/candle).
+Helsinki-NLP on Hugging Face (`opus-mt-fr-en`, `opus-mt-en-fr`, their
+`tc-big` versions, and `opus-mt-es-en`, `opus-mt-en-es` and so on for the
+other languages), run with [candle](https://github.com/huggingface/candle).
 They translate one sentence at a time, and they translate idioms word for
 word: "il pleut des cordes" becomes "it's raining ropes".
+
+A model knows one direction and lives in a folder named after it
+(`light/es-en`). The engine has no list of languages: it uses the folders it
+finds, so a model put there by hand works too. The language of a text is
+told by the language recognizer of macOS (the NaturalLanguage framework,
+offline), asked only for the languages that are installed, and Coco follows
+it only when it leaves little doubt.
 
 American and British English come from a word list
 ([VarCon](http://wordlist.aspell.net/varcon/)) applied to the English text
@@ -71,7 +103,8 @@ after translation; the notices are in `crates/dialect`.
 cargo run -p coco                      # the app, without a bundle
 cargo test --workspace                 # every test
 cargo run -p coco-blob --example sheet -- sheet.svg   # Coco's poses as a picture
-cargo run --release -p coco-engine --example install -- light   # download a set as the app does
+cargo run --release -p coco-engine --example install -- light   # download a set as the app does (or a language: es)
+cargo run --release -p coco-engine --example translate -- --dir es-de "Hola"   # translate from a terminal
 cargo run --release -p coco-blob --example icon -- assets/icon-1024.png
 ```
 

@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use coco_blob::Mood;
-use coco_engine::{Quality, Translator};
+use coco_engine::{Installed, Quality, Translator};
 use gpui::{
     AnyWindowHandle, App, Bounds, Context, Entity, Styled as _, Subscription, WindowBackgroundAppearance,
     WindowBounds, WindowKind, WindowOptions, point, prelude::*, px, size,
@@ -42,7 +42,7 @@ pub struct Coco {
     settings: Settings,
     translator: Translator,
     models: PathBuf,
-    installed: Vec<Quality>,
+    installed: Installed,
     mascot: Entity<MascotView>,
     mascot_window: Retained<NSWindow>,
     panel: Option<PanelWindow>,
@@ -302,7 +302,7 @@ impl Coco {
             OnboardingEvent::Mood(mood) => self.mascot.update(cx, |mascot, cx| mascot.set_mood(*mood, cx)),
             OnboardingEvent::ModelInstalled => {
                 self.installed = Translator::installed(&self.models);
-                let (installed, quality) = (self.installed.clone(), self.settings.quality(&self.installed));
+                let (installed, quality) = (self.installed.clone(), self.settings.quality(&self.installed.qualities()));
                 if let Some(panel) = &self.panel {
                     panel.view.update(cx, |panel, cx| panel.set_installed(installed, quality, cx));
                 }
@@ -337,8 +337,9 @@ impl Coco {
         let translator = self.translator.clone();
         let options = PanelOptions {
             direction: self.settings.direction(),
+            detect: self.settings.detect_language,
             english: self.settings.english(),
-            quality: self.settings.quality(&self.installed),
+            quality: self.settings.quality(&self.installed.qualities()),
             installed: self.installed.clone(),
             mascot_size: self.settings.mascot_size,
             open_at_login: self.settings.open_at_login,
@@ -415,12 +416,15 @@ impl Coco {
             PanelEvent::HideRequested => self.hide_panel(cx),
             PanelEvent::QuitRequested => cx.quit(),
             PanelEvent::ModelsRequested => self.show_onboarding(vec![Step::Models], Permission::Unavailable, cx),
+            PanelEvent::LanguagesRequested => self.show_onboarding(vec![Step::Languages], Permission::Unavailable, cx),
             PanelEvent::PreferencesChanged => {
                 if let Some(panel) = self.panel.as_ref().map(|panel| panel.view.read(cx)) {
-                    self.settings.french_to_english = panel.direction() == coco_engine::Direction::FrToEn;
+                    let direction = panel.direction();
+                    (self.settings.from, self.settings.to) = (direction.from, direction.to);
+                    self.settings.detect_language = panel.detects();
                     self.settings.british = panel.english() == coco_engine::EnglishVariant::British;
                     // Keep the wish for a model that is not installed yet.
-                    if panel.quality() != self.settings.quality(&self.installed) {
+                    if panel.quality() != self.settings.quality(&self.installed.qualities()) {
                         self.settings.accurate = panel.quality() == Quality::Accurate;
                     }
                     self.save();
