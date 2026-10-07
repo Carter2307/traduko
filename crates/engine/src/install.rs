@@ -19,7 +19,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded};
@@ -417,6 +417,13 @@ static TURNS: [Mutex<()>; 2] = [Mutex::new(()), Mutex::new(())];
 /// The same for the languages, which take turns among themselves. French
 /// is also the light set: it waits for that one too.
 static LANGUAGE_TURN: Mutex<()> = Mutex::new(());
+
+/// Waits for the installations that are running, and holds the next ones
+/// back for as long as what it gives is kept: no folder is written while
+/// models are taken off the disk.
+pub(crate) fn turns() -> Vec<MutexGuard<'static, ()>> {
+    TURNS.iter().chain([&LANGUAGE_TURN]).map(|turn| turn.lock().unwrap_or_else(PoisonError::into_inner)).collect()
+}
 
 /// Starts downloading a set into `models_dir`. Never blocks. The stream ends
 /// after `Done` or `Failed`; dropping it stops the download.

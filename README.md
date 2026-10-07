@@ -48,6 +48,15 @@ pinned by SHA-256; the other languages are pinned as downloaded and record
 their installed SHA-256 the first time they are fetched (see the table in
 `scripts/fetch-models.sh`).
 
+### Disk space
+
+With both models installed, French and English are only translated by the
+one that is chosen: the other one is on disk for nothing (about 300 MB for
+the light one, 930 MB for the accurate one). **Delete unused model** in the
+Light / Accurate menu removes it; the entry is there when there is something
+to remove, and says how much. **Download models…** brings it back. The
+languages you added are never removed: each has one model per direction.
+
 To remove everything (dry run first, then `--yes`):
 
 ```bash
@@ -65,7 +74,7 @@ scripts/uninstall.sh
 | The language over the bottom card | Choose the language to translate to |
 | The arrows in the top card, or ⌘⇧S | Swap the languages |
 | American / British | Choose the English you want, when translating to English |
-| Light / Accurate | Choose the model and Coco's size (small, medium, large), download the other model, open at login, quit |
+| Light / Accurate | Choose the model and Coco's size (small, medium, large), download the other model or delete it, open at login, quit |
 | ⌘⇧C, or Copy | Copy the translation |
 | Esc, or × | Close the panel |
 

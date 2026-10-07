@@ -46,13 +46,22 @@ pub(crate) fn folder(models_dir: &Path, hop: Hop) -> PathBuf {
 /// True when every file of a model is there. The files are not opened: this
 /// runs at start-up, and a damaged file is reported when it is loaded.
 pub(crate) fn is_complete(folder: &Path) -> bool {
-    FILES.iter().all(|file| folder.join(file).is_file())
+    size(folder).is_some()
+}
+
+/// What the files of a model take together, in bytes, when every one of
+/// them is there.
+fn size(folder: &Path) -> Option<u64> {
+    let file = |file: &&str| std::fs::metadata(folder.join(file)).ok().filter(|found| found.is_file()).map(|found| found.len());
+    FILES.iter().map(file).sum()
 }
 
 /// The models found on disk.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Installed {
     models: Vec<Hop>,
+    /// What each of them takes on disk, in bytes, in the same order.
+    bytes: Vec<u64>,
 }
 
 impl Installed {
@@ -64,18 +73,27 @@ impl Installed {
             let Ok(folders) = std::fs::read_dir(models_dir.join(quality.folder())) else { continue };
             for folder in folders.flatten() {
                 let direction = folder.file_name().to_str().and_then(Direction::from_code);
-                if let Some(direction) = direction.filter(|direction| direction.from != direction.to && is_complete(&folder.path())) {
-                    models.push(Hop { quality, direction });
+                if let Some(direction) = direction.filter(|direction| direction.from != direction.to)
+                    && let Some(bytes) = size(&folder.path())
+                {
+                    models.push((Hop { quality, direction }, bytes));
                 }
             }
         }
-        Self::of(models)
+        Self::weighing(models)
     }
 
-    pub(crate) fn of(mut models: Vec<Hop>) -> Self {
+    /// These models, without a size: for what does not look at the disk.
+    #[cfg(test)]
+    pub(crate) fn of(models: Vec<Hop>) -> Self {
+        Self::weighing(models.into_iter().map(|hop| (hop, 0)).collect())
+    }
+
+    fn weighing(mut models: Vec<(Hop, u64)>) -> Self {
         // The order of a folder listing is not a promise.
-        models.sort_by_key(|hop| (hop.quality as u8, hop.direction.from, hop.direction.to));
-        Self { models }
+        models.sort_by_key(|(hop, _)| (hop.quality as u8, hop.direction.from, hop.direction.to));
+        let (models, bytes) = models.into_iter().unzip();
+        Self { models, bytes }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -118,6 +136,21 @@ impl Installed {
     /// English: two translations, each with its own mistakes.
     pub fn goes_through_english(&self, direction: Direction) -> bool {
         self.route(Quality::Light, direction).is_some_and(|route| route.len() > 1)
+    }
+
+    /// The models that are on disk for nothing while `quality` is the one
+    /// asked for, and what each takes there: those of the other quality
+    /// whose direction `quality` has too. No route takes them: see
+    /// [`Installed::route`].
+    pub(crate) fn unused(&self, quality: Quality) -> impl Iterator<Item = (Hop, u64)> + '_ {
+        let weighed = self.models.iter().copied().zip(self.bytes.iter().copied());
+        weighed.filter(move |(hop, _)| hop.quality != quality && self.has(quality, hop.direction))
+    }
+
+    /// What the models that nothing uses take on disk, in bytes: what
+    /// [`remove_unused`](crate::remove_unused) frees.
+    pub fn unused_size(&self, quality: Quality) -> u64 {
+        self.unused(quality).map(|(_, bytes)| bytes).sum()
     }
 
     /// The models that take a text along `direction`, in order: one, or two
@@ -179,11 +212,13 @@ mod tests {
         fill(&models.join("light/notes"), &FILES);
         fill(&models.join("light/fr-fr"), &FILES);
         fill(&models.join("heavy/fr-en"), &FILES);
-        assert_eq!(Installed::scan(&models), installed(&[(Light, "es-en"), (Light, "fr-en")]), "a missing file makes a model incomplete");
+        assert_eq!(Installed::scan(&models).models, [hop(Light, "es-en"), hop(Light, "fr-en")], "a missing file makes a model incomplete");
 
         fill(&folder(&models, hop(Accurate, "en-fr")), &FILES);
         let found = Installed::scan(&models);
-        assert_eq!(found, installed(&[(Light, "es-en"), (Light, "fr-en"), (Accurate, "en-fr")]));
+        assert_eq!(found.models, [hop(Light, "es-en"), hop(Light, "fr-en"), hop(Accurate, "en-fr")]);
+        // One byte in each of the five files.
+        assert_eq!(found.bytes, [5, 5, 5]);
         assert_eq!(found.qualities(), [Light, Accurate]);
         assert_eq!(found.languages(), ["en", "es", "fr"].map(|code| Language::from_code(code).unwrap()));
         std::fs::remove_dir_all(models).ok();
@@ -228,6 +263,53 @@ mod tests {
         // A model for the direction itself is better than two.
         let direct = installed(&[(Light, "fr-en"), (Light, "en-de"), (Light, "fr-de")]);
         assert_eq!(direct.route(Accurate, direction("fr-de")), Some(vec![hop(Light, "fr-de")]));
+    }
+
+    #[test]
+    fn a_model_whose_direction_the_asked_quality_has_too_is_unused() {
+        let models = installed(&[(Light, "fr-en"), (Light, "en-fr"), (Accurate, "fr-en"), (Accurate, "en-fr"), (Light, "de-en"), (Light, "en-de")]);
+        let unused = |quality| models.unused(quality).map(|(hop, _)| hop).collect::<Vec<_>>();
+        assert_eq!(unused(Accurate), [hop(Light, "en-fr"), hop(Light, "fr-en")]);
+        assert_eq!(unused(Light), [hop(Accurate, "en-fr"), hop(Accurate, "fr-en")]);
+
+        // Half a set is still needed for the direction that the other lacks.
+        let half = installed(&[(Light, "fr-en"), (Light, "en-fr"), (Accurate, "fr-en")]);
+        assert_eq!(half.unused(Accurate).map(|(hop, _)| hop).collect::<Vec<_>>(), [hop(Light, "fr-en")]);
+        // One quality alone has nothing to spare, whichever is asked for.
+        let alone = installed(&[(Light, "fr-en"), (Light, "en-fr"), (Light, "de-en")]);
+        assert_eq!((alone.unused(Light).count(), alone.unused(Accurate).count()), (0, 0));
+    }
+
+    #[test]
+    fn no_route_takes_an_unused_model_and_none_changes_without_them() {
+        let all = [(Light, "fr-en"), (Light, "en-fr"), (Accurate, "fr-en"), (Accurate, "en-fr"), (Light, "de-en"), (Light, "en-de"), (Accurate, "de-en"), (Light, "es-en")];
+        let models = installed(&all);
+        for quality in QUALITIES {
+            let unused: Vec<Hop> = models.unused(quality).map(|(hop, _)| hop).collect();
+            let kept = Installed::of(models.models.iter().copied().filter(|hop| !unused.contains(hop)).collect());
+            assert!(!unused.is_empty() && kept.unused(quality).count() == 0);
+            let languages = models.languages();
+            for direction in languages.iter().flat_map(|from| languages.iter().map(|to| Direction::new(*from, *to))) {
+                let route = models.route(quality, direction);
+                assert!(route.iter().flatten().all(|hop| !unused.contains(hop)), "{quality:?} {direction:?}");
+                assert_eq!(kept.route(quality, direction), route, "{quality:?} {direction:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_unused_models_are_weighed_by_their_files() {
+        let models = std::env::temp_dir().join(format!("coco-store-unused-{}", std::process::id()));
+        for (model, weights) in [(hop(Light, "fr-en"), 300), (hop(Light, "en-fr"), 200), (hop(Accurate, "fr-en"), 1000), (hop(Accurate, "en-fr"), 900), (hop(Light, "de-en"), 50)] {
+            fill(&folder(&models, model), &FILES);
+            std::fs::write(folder(&models, model).join(FILES[0]), vec![0u8; weights]).expect("write the weights");
+        }
+        let found = Installed::scan(&models);
+        // The weights and the four files of one byte, for each direction.
+        assert_eq!(found.unused_size(Accurate), 300 + 200 + 8);
+        assert_eq!(found.unused_size(Light), 1000 + 900 + 8);
+        assert_eq!(Installed::default().unused_size(Light), 0);
+        std::fs::remove_dir_all(models).ok();
     }
 
     #[test]

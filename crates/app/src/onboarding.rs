@@ -520,7 +520,8 @@ fn lines(rows: Vec<Div>, p: &Palette) -> Div {
     lines
 }
 
-fn megabytes(bytes: u64) -> u64 {
+/// Bytes as the megabytes that the Finder shows.
+pub fn megabytes(bytes: u64) -> u64 {
     (bytes as f64 / 1e6).round() as u64
 }
 
