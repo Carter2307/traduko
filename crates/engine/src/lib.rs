@@ -19,6 +19,7 @@
 //!
 //! The models themselves come from the Hub: [`install`] downloads a set and
 //! checks it, for an app that was not set up by `scripts/fetch-models.sh`.
+//! [`remove_unused`] takes off the disk the ones that no translation uses.
 
 mod backend;
 mod cache;
@@ -29,6 +30,7 @@ mod marian;
 mod memory;
 mod model;
 mod narrow;
+mod remove;
 mod search;
 mod spm;
 mod store;
@@ -47,6 +49,7 @@ pub use install::{InstallUpdate, download_size, install, install_language, langu
 pub use language::{Direction, Language};
 pub use memory::ReturnsLargeBlocks;
 pub use narrow::to_f16;
+pub use remove::remove_unused;
 pub use store::Installed;
 
 use backend::{Backend, OnDisk};

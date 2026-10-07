@@ -12,7 +12,7 @@ use gpui_component::Root;
 use objc2::rc::Retained;
 use objc2_app_kit::NSWindow;
 use traduko_blob::Mood;
-use traduko_engine::{Installed, Quality, Translator};
+use traduko_engine::{Installed, Quality, Translator, remove_unused};
 
 use crate::login::{self, Permission};
 use crate::mascot_view::{self, MascotEvent, MascotView};
@@ -302,13 +302,7 @@ impl Traduko {
     fn on_onboarding_event(&mut self, event: &OnboardingEvent, cx: &mut Context<Self>) {
         match event {
             OnboardingEvent::Mood(mood) => self.mascot.update(cx, |mascot, cx| mascot.set_mood(*mood, cx)),
-            OnboardingEvent::ModelInstalled => {
-                self.installed = Translator::installed(&self.models);
-                let (installed, quality) = (self.installed.clone(), self.settings.quality(&self.installed.qualities()));
-                if let Some(panel) = &self.panel {
-                    panel.view.update(cx, |panel, cx| panel.set_installed(installed, quality, cx));
-                }
-            }
+            OnboardingEvent::ModelInstalled => self.look_at_the_models(cx),
             OnboardingEvent::LoginChanged(outcome) => self.on_login_outcome(outcome.clone(), cx),
             OnboardingEvent::Finished { open_at_login } => {
                 if let Some(on) = open_at_login {
@@ -332,6 +326,48 @@ impl Traduko {
                 }
             }
         }
+    }
+
+    /// Reads again what is on disk, after a model came or went, and tells
+    /// the panel.
+    fn look_at_the_models(&mut self, cx: &mut Context<Self>) {
+        self.installed = Translator::installed(&self.models);
+        let (installed, quality) = (self.installed.clone(), self.settings.quality(&self.installed.qualities()));
+        if let Some(panel) = &self.panel {
+            panel.view.update(cx, |panel, cx| panel.set_installed(installed, quality, cx));
+        }
+    }
+
+    /// Takes off the disk the model that the chosen one leaves without
+    /// work. What the panel translates with stays as it is.
+    fn delete_unused_model(&mut self, cx: &mut Context<Self>) {
+        let Some(quality) = self.panel.as_ref().map(|panel| panel.view.read(cx).quality()) else { return };
+        let models = self.models.clone();
+        // Not on this thread: it waits for a download that is on its way out.
+        let removing = cx.background_spawn(async move { remove_unused(&models, quality) });
+        cx.spawn(async move |this, cx| {
+            let outcome = removing.await;
+            this.update(cx, |this, cx| this.on_unused_model_deleted(outcome, cx)).ok();
+        })
+        .detach();
+    }
+
+    fn on_unused_model_deleted(&mut self, outcome: Result<u64, String>, cx: &mut Context<Self>) {
+        // Whatever it said, the disk is what counts now.
+        self.look_at_the_models(cx);
+        let (notice, went_well) = match outcome {
+            // Nothing was in the way any more: nothing to say.
+            Ok(0) => return,
+            Ok(freed) => (format!("Freed {} MB", onboarding::megabytes(freed)), true),
+            Err(why) => {
+                eprintln!("traduko: cannot delete the unused model: {why}");
+                ("Could not delete the model".to_string(), false)
+            }
+        };
+        if let Some(panel) = &self.panel {
+            panel.view.update(cx, |panel, cx| panel.say(notice, went_well, cx));
+        }
+        self.mascot.update(cx, |mascot, cx| if went_well { mascot.nudge(cx) } else { mascot.set_mood(Mood::Sorry, cx) });
     }
 
     fn open_panel(&mut self, cx: &mut Context<Self>) -> anyhow::Result<PanelWindow> {
@@ -419,6 +455,7 @@ impl Traduko {
             PanelEvent::QuitRequested => cx.quit(),
             PanelEvent::ModelsRequested => self.show_onboarding(vec![Step::Models], Permission::Unavailable, cx),
             PanelEvent::LanguagesRequested => self.show_onboarding(vec![Step::Languages], Permission::Unavailable, cx),
+            PanelEvent::DeletionRequested => self.delete_unused_model(cx),
             PanelEvent::PreferencesChanged => {
                 if let Some(panel) = self.panel.as_ref().map(|panel| panel.view.read(cx)) {
                     let direction = panel.direction();

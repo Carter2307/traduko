@@ -25,6 +25,7 @@ use traduko_engine::{Direction, EnglishVariant, Installed, Language, Quality, Re
 
 use crate::detect;
 use crate::mascot_view;
+use crate::onboarding::megabytes;
 use crate::settings::{Accent, MascotSize};
 use crate::theme::{self, MONO, SHELL_PAD, SHELL_RADIUS, card, chip, grip, micro};
 
@@ -42,6 +43,7 @@ actions!(
         MascotLarge,
         ToggleOpenAtLogin,
         ShowModels,
+        DeleteUnusedModel,
         QuitTraduko
     ]
 );
@@ -55,6 +57,9 @@ pub const SHELL_HEIGHT: f32 = 548.0;
 pub const MARGIN: f32 = theme::SHELL_MARGIN;
 
 const DEBOUNCE: Duration = Duration::from_millis(350);
+/// How long the header says what just happened before it goes back to the
+/// status.
+const NOTICE: Duration = Duration::from_millis(2600);
 
 pub enum PanelEvent {
     /// A translation started.
@@ -73,6 +78,8 @@ pub enum PanelEvent {
     OpenAtLoginChanged(bool),
     /// The user wants to download a model.
     ModelsRequested,
+    /// The user wants the model that nothing uses off the disk.
+    DeletionRequested,
     /// The user wants a language that is not in the menus.
     LanguagesRequested,
     QuitRequested,
@@ -87,6 +94,14 @@ enum Phase {
     Translating { done: usize, total: usize },
     Done { elapsed: Duration },
     Failed(SharedString),
+}
+
+/// What the header says for a moment in place of the status.
+struct Notice {
+    text: SharedString,
+    dot: StatusDot,
+    /// Takes the notice away when its time is up. A newer notice drops it.
+    _fading: Task<()>,
 }
 
 pub struct Panel {
@@ -111,6 +126,7 @@ pub struct Panel {
     /// the engine to stop.
     job: Option<Task<()>>,
     copied: bool,
+    notice: Option<Notice>,
     translator: Translator,
     face: Frame,
     _subscriptions: Vec<Subscription>,
@@ -170,6 +186,7 @@ impl Panel {
             debounce: None,
             job: None,
             copied: false,
+            notice: None,
             translator,
             face: Mascot::new(Mood::Idle).frame(),
             _subscriptions: subscriptions,
@@ -204,6 +221,22 @@ impl Panel {
 
     pub fn set_open_at_login(&mut self, on: bool, cx: &mut Context<Self>) {
         self.open_at_login = on;
+        cx.notify();
+    }
+
+    /// Says what just happened, in the header, for a moment. `went_well`
+    /// gives it the dot of a thing that is done.
+    pub fn say(&mut self, text: impl Into<SharedString>, went_well: bool, cx: &mut Context<Self>) {
+        let fading = cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(NOTICE).await;
+            this.update(cx, |this, cx| {
+                this.notice = None;
+                cx.notify();
+            })
+            .ok();
+        });
+        let dot = if went_well { StatusDot::Ok } else { StatusDot::Quiet };
+        self.notice = Some(Notice { text: text.into(), dot, _fading: fading });
         cx.notify();
     }
 
@@ -426,6 +459,9 @@ impl Panel {
     }
 
     fn status(&self) -> (SharedString, StatusDot) {
+        if let Some(notice) = &self.notice {
+            return (notice.text.clone(), notice.dot);
+        }
         match &self.phase {
             Phase::Idle => ("Ready".into(), StatusDot::Quiet),
             Phase::Typing => ("Listening".into(), StatusDot::Busy),
@@ -726,6 +762,9 @@ impl Render for Panel {
         };
 
         let (quality, installed, open_at_login) = (self.quality, self.installed.qualities(), self.open_at_login);
+        // The model that the chosen one leaves without work, when it is on
+        // disk: the other one of French and English.
+        let unused = self.installed.unused_size(quality);
         let (mascot_size, accent) = (self.mascot_size, p.accent);
         let focus = self.focus.clone();
         let options = Button::new("options")
@@ -745,11 +784,14 @@ impl Render for Panel {
                 if installed.contains(&Quality::Accurate) {
                     menu = menu.menu_with_check("Accurate · opus-mt-tc-big", quality == Quality::Accurate, Box::new(UseAccurate));
                 }
+                let mut menu = menu.menu("Download models…", Box::new(ShowModels));
+                if unused > 0 {
+                    menu = menu.menu(format!("Delete unused model · {} MB", megabytes(unused)), Box::new(DeleteUnusedModel));
+                }
                 // The colours are a menu of their own: listed here, they
                 // would push this one out of the top of the shell.
                 let colors = colors.clone();
-                menu.menu("Download models…", Box::new(ShowModels))
-                    .separator()
+                menu.separator()
                     .label("Mascot size")
                     .menu_with_check("Small", mascot_size == MascotSize::Small, Box::new(MascotSmall))
                     .menu_with_check("Medium", mascot_size == MascotSize::Medium, Box::new(MascotMedium))
@@ -840,6 +882,7 @@ impl Render for Panel {
                 cx.notify();
             }))
             .on_action(cx.listener(|_, _: &ShowModels, _, cx| cx.emit(PanelEvent::ModelsRequested)))
+            .on_action(cx.listener(|_, _: &DeleteUnusedModel, _, cx| cx.emit(PanelEvent::DeletionRequested)))
             .on_action(cx.listener(|_, _: &QuitTraduko, _, cx| cx.emit(PanelEvent::QuitRequested)))
             .w(px(SHELL_WIDTH))
             .h(px(SHELL_HEIGHT))
