@@ -4,8 +4,8 @@
 use std::borrow::Cow;
 
 use gpui::{
-    App, BoxShadow, Div, ElementId, FontWeight, Global, Hsla, MouseButton, SharedString, Stateful, WindowAppearance,
-    div, point, prelude::*, px, rgb, rgba,
+    App, Div, ElementId, FontWeight, Global, Hsla, MouseButton, SharedString, Stateful, WindowAppearance, div,
+    prelude::*, px, rgb, rgba,
 };
 use gpui_component::{Icon, Theme, ThemeMode};
 use gpui_kit_assets::IconName;
@@ -20,13 +20,18 @@ pub const MONO: &str = "Geist Mono";
 pub const SHELL_RADIUS: f32 = 34.0;
 pub const SHELL_PAD: f32 = 10.0;
 pub const CARD_RADIUS: f32 = SHELL_RADIUS - SHELL_PAD;
-/// Transparent room around a shell, in its window, for the shadow.
+/// Transparent room around a shell, in its window.
 pub const SHELL_MARGIN: f32 = 36.0;
 
 #[derive(Clone, Copy)]
 pub struct Palette {
-    pub shell: Hsla,
+    /// The shell is the glass of macOS (see `native::glass`), and the cards
+    /// let it show, like the chips and the lines on them. gpui adds up the
+    /// opacity of what it draws on a transparent window: anything else that
+    /// is see-through under a card would make the card opaque.
     pub card: Hsla,
+    /// A menu opens over text: nothing shows through it.
+    pub menu: Hsla,
     pub ink: Hsla,
     pub muted: Hsla,
     pub line: Hsla,
@@ -36,7 +41,6 @@ pub struct Palette {
     pub accent: Accent,
     pub primary: Hsla,
     pub ok: Hsla,
-    pub shadow: Hsla,
 }
 
 impl Global for Palette {}
@@ -71,34 +75,32 @@ impl Accent {
 impl Palette {
     fn light(accent: Accent) -> Self {
         Self {
-            shell: rgb(0xf2f2f2).into(),
-            card: rgb(0xffffff).into(),
+            card: rgba(0xffffffa8).into(),
+            menu: rgb(0xffffff).into(),
             ink: rgb(0x121214).into(),
             // Dark enough for small text on the white cards (4.9 to 1).
             muted: rgb(0x707075).into(),
-            line: rgb(0xe4e4e6).into(),
-            chip: rgb(0xf2f2f3).into(),
-            chip_hover: rgb(0xe8e8ea).into(),
+            line: rgba(0x00000014).into(),
+            chip: rgba(0x0000000f).into(),
+            chip_hover: rgba(0x0000001c).into(),
             accent,
             primary: rgb(accent.hex().0).into(),
             ok: rgb(0x1fb46a).into(),
-            shadow: rgba(0x00000026).into(),
         }
     }
 
     fn dark(accent: Accent) -> Self {
         Self {
-            shell: rgb(0x1c1c1e).into(),
-            card: rgb(0x28282a).into(),
+            card: rgba(0x242427a0).into(),
+            menu: rgb(0x28282a).into(),
             ink: rgb(0xf4f4f5).into(),
-            muted: rgb(0x8e8e93).into(),
-            line: rgb(0x38383b).into(),
-            chip: rgb(0x343437).into(),
-            chip_hover: rgb(0x404044).into(),
+            muted: rgb(0xa0a0a6).into(),
+            line: rgba(0xffffff1a).into(),
+            chip: rgba(0xffffff1a).into(),
+            chip_hover: rgba(0xffffff2b).into(),
             accent,
             primary: rgb(accent.hex().1).into(),
             ok: rgb(0x34c77b).into(),
-            shadow: rgba(0x00000066).into(),
         }
     }
 }
@@ -166,15 +168,6 @@ pub fn close(p: &Palette) -> Stateful<Div> {
         .child(Icon::new(IconName::X).size(px(14.)))
 }
 
-/// The shadow of a shell. Kept short of `SHELL_MARGIN`, or it ends on a
-/// straight line at the edge of the window.
-pub fn shell_shadow(p: &Palette) -> Vec<BoxShadow> {
-    vec![
-        BoxShadow { color: p.shadow, offset: point(px(0.), px(12.)), blur_radius: px(20.), spread_radius: px(-6.), inset: false },
-        BoxShadow { color: p.shadow.opacity(0.08), offset: point(px(0.), px(1.)), blur_radius: px(3.), spread_radius: px(0.), inset: false },
-    ]
-}
-
 pub fn register_fonts(cx: &mut App) {
     let fonts: [&'static [u8]; 5] = [
         include_bytes!("../../../assets/fonts/Geist-Regular.otf"),
@@ -203,11 +196,16 @@ pub fn set_accent(accent: Accent, cx: &mut App) {
 }
 
 fn apply_with(appearance: WindowAppearance, accent: Accent, cx: &mut App) {
-    let mode = match std::env::var("TRADUKO_APPEARANCE").as_deref() {
-        Ok("light") => ThemeMode::Light,
-        Ok("dark") => ThemeMode::Dark,
-        _ => ThemeMode::from(appearance),
+    let forced = match std::env::var("TRADUKO_APPEARANCE").as_deref() {
+        Ok("light") => Some(ThemeMode::Light),
+        Ok("dark") => Some(ThemeMode::Dark),
+        _ => None,
     };
+    // The glass is the system's: it has to be told as well.
+    if let Some(mode) = forced {
+        crate::native::set_appearance(mode.is_dark());
+    }
+    let mode = forced.unwrap_or_else(|| ThemeMode::from(appearance));
     let palette = if mode.is_dark() { Palette::dark(accent) } else { Palette::light(accent) };
     cx.set_global(palette);
 
@@ -235,7 +233,7 @@ fn apply_with(appearance: WindowAppearance, accent: Accent, cx: &mut App) {
         theme.secondary_hover = palette.chip_hover;
         theme.secondary_active = palette.chip_hover;
         theme.secondary_foreground = palette.ink;
-        theme.popover = palette.card;
+        theme.popover = palette.menu;
         theme.popover_foreground = palette.ink;
     });
 }
