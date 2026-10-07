@@ -1,11 +1,13 @@
 //! Traduko as a whole: the mascot on the desktop, the translator panel it
 //! opens, the screens of the first run, the engine behind them, and what is
-//! remembered between runs.
+//! remembered between runs: the settings and the history.
 
 use std::path::PathBuf;
 
+use futures::StreamExt as _;
+use futures::channel::mpsc;
 use gpui::{
-    AnyWindowHandle, App, Bounds, Context, Entity, Styled as _, Subscription, WindowBackgroundAppearance,
+    AnyWindowHandle, App, Bounds, Context, Entity, Styled as _, Subscription, Task, WindowBackgroundAppearance,
     WindowBounds, WindowKind, WindowOptions, point, prelude::*, px, size,
 };
 use gpui_component::Root;
@@ -14,9 +16,10 @@ use objc2_app_kit::NSWindow;
 use traduko_blob::Mood;
 use traduko_engine::{Installed, Quality, Translator, remove_unused};
 
+use crate::history::{Entry, History};
 use crate::login::{self, Permission};
 use crate::mascot_view::{self, MascotEvent, MascotView};
-use crate::native::{self, Floating, Rect};
+use crate::native::{self, ClicksElsewhere, Floating, Rect};
 use crate::onboarding::{self, Onboarding, OnboardingEvent, OnboardingOptions, Step};
 use crate::panel::{self, Panel, PanelEvent, PanelOptions};
 use crate::settings::{self, Settings};
@@ -27,6 +30,8 @@ struct PanelWindow {
     view: Entity<Panel>,
     native: Retained<NSWindow>,
     visible: bool,
+    /// While the panel is open: a click in another app closes it.
+    clicks_elsewhere: Option<ClicksElsewhere>,
     _events: Subscription,
 }
 
@@ -40,6 +45,7 @@ struct OnboardingWindow {
 pub struct Traduko {
     support: PathBuf,
     settings: Settings,
+    history: History,
     translator: Translator,
     models: PathBuf,
     installed: Installed,
@@ -47,13 +53,18 @@ pub struct Traduko {
     mascot_window: Retained<NSWindow>,
     panel: Option<PanelWindow>,
     onboarding: Option<OnboardingWindow>,
+    /// Where a click in another app is told: AppKit sees it outside of gpui.
+    clicked_elsewhere: mpsc::UnboundedSender<()>,
+    _closing_on_clicks: Task<()>,
     _mascot_events: Subscription,
+    _quitting: Subscription,
 }
 
 impl Traduko {
     /// Opens the mascot and starts everything behind it.
     pub fn start(support: PathBuf, cx: &mut App) -> anyhow::Result<Entity<Self>> {
         let settings = Settings::load(&support);
+        let history = History::new(&support);
         crate::theme::set_accent(settings.accent, cx);
         let models = settings::models_dir();
         let installed = Translator::installed(&models);
@@ -70,8 +81,36 @@ impl Traduko {
                 MascotEvent::Moved => this.on_mascot_moved(cx),
             });
 
-            let mut this =
-                Self { support, settings, translator, models, installed, mascot, mascot_window, panel: None, onboarding: None, _mascot_events: mascot_events };
+            let (clicked_elsewhere, mut clicks) = mpsc::unbounded();
+            let closing_on_clicks = cx.spawn(async move |this, cx| {
+                while clicks.next().await.is_some() {
+                    if this.update(cx, |this, cx| this.hide_panel(cx)).is_err() {
+                        break;
+                    }
+                }
+            });
+            // A translation that had no time to stay on screen is kept too.
+            let quitting = cx.on_app_quit(|this: &mut Self, cx| {
+                this.keep_what_is_on_screen(cx);
+                async {}
+            });
+
+            let mut this = Self {
+                support,
+                settings,
+                history,
+                translator,
+                models,
+                installed,
+                mascot,
+                mascot_window,
+                panel: None,
+                onboarding: None,
+                clicked_elsewhere,
+                _closing_on_clicks: closing_on_clicks,
+                _mascot_events: mascot_events,
+                _quitting: quitting,
+            };
             // The first run asks before Traduko becomes a login item. A copy
             // that was one before these screens existed stays one.
             if this.settings.onboarded || this.settings.registered_install.is_some() {
@@ -144,6 +183,15 @@ impl Traduko {
         let (place, side) = self.panel_place();
         let Some(panel) = self.panel.as_mut() else { return };
         panel.visible = true;
+        // Like a menu, the panel goes away at a click elsewhere. One that
+        // came without the keyboard is there for a capture, whatever its
+        // user clicks meanwhile.
+        if take_keyboard && panel.clicks_elsewhere.is_none() {
+            let clicked = self.clicked_elsewhere.clone();
+            panel.clicks_elsewhere = ClicksElsewhere::watch(move || {
+                clicked.unbounded_send(()).ok();
+            });
+        }
         let (handle, view, window) = (panel.handle, panel.view.clone(), panel.native.clone());
 
         // Load the model while the user starts typing.
@@ -178,12 +226,29 @@ impl Traduko {
     pub fn hide_panel(&mut self, cx: &mut Context<Self>) {
         let Some(panel) = self.panel.as_mut() else { return };
         panel.visible = false;
+        panel.clicks_elsewhere = None;
         let window = panel.native.clone();
         cx.spawn(async move |_, _| native::hide(&window)).detach();
+        self.keep_what_is_on_screen(cx);
         self.mascot.update(cx, |mascot, cx| {
             mascot.look_towards(None, cx);
             mascot.set_breathing(false, cx);
         });
+    }
+
+    /// Records the translation that is in the panel, if the history does
+    /// not have it: the panel is closing before it had time to stay.
+    fn keep_what_is_on_screen(&mut self, cx: &mut Context<Self>) {
+        let Some(panel) = &self.panel else { return };
+        if let Some(entry) = panel.view.update(cx, |panel, _| panel.take_unkept()) {
+            self.remember(entry);
+        }
+    }
+
+    fn remember(&mut self, entry: Entry) {
+        if let Err(error) = self.history.record(entry) {
+            eprintln!("traduko: cannot write the history: {error}");
+        }
     }
 
     /// Opens the screens of the first run once macOS has said whether the
@@ -419,7 +484,7 @@ impl Traduko {
             .ok_or_else(|| anyhow::anyhow!("the panel has no native window"))?;
         let events = cx.subscribe(&view, |this, _, event, cx| this.on_panel_event(event, cx));
 
-        Ok(PanelWindow { handle: handle.into(), view, native, visible: false, _events: events })
+        Ok(PanelWindow { handle: handle.into(), view, native, visible: false, clicks_elsewhere: None, _events: events })
     }
 
     /// Where the panel window goes, and on which side of the mascot it is
@@ -451,8 +516,12 @@ impl Traduko {
             PanelEvent::Working => mood(self, Mood::Thinking, cx),
             PanelEvent::Translated => mood(self, Mood::Happy, cx),
             PanelEvent::Failed => mood(self, Mood::Sorry, cx),
-            PanelEvent::Cleared => mood(self, Mood::Idle, cx),
+            PanelEvent::Cleared => {
+                mood(self, Mood::Idle, cx);
+                self.history.next_text();
+            }
             PanelEvent::Copied => self.mascot.update(cx, |mascot, cx| mascot.nudge(cx)),
+            PanelEvent::Kept(entry) => self.remember(entry.clone()),
             PanelEvent::HideRequested => self.hide_panel(cx),
             PanelEvent::QuitRequested => cx.quit(),
             PanelEvent::ModelsRequested => self.show_onboarding(vec![Step::Models], Permission::Unavailable, cx),

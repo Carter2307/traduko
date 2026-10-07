@@ -4,6 +4,9 @@
 //! Each of the two text cards names its language, and that name is a menu
 //! of the languages that have a model. The top one can also be left to
 //! Traduko, which then reads the language off the text.
+//!
+//! A translation that stays on screen is handed to the history: see
+//! [`PanelEvent::Kept`].
 
 use std::time::Duration;
 
@@ -24,6 +27,7 @@ use traduko_blob::{Frame, Mascot, Mood};
 use traduko_engine::{Direction, EnglishVariant, Installed, Language, Quality, Request, Translator, Update};
 
 use crate::detect;
+use crate::history::{self, Entry};
 use crate::mascot_view;
 use crate::onboarding::megabytes;
 use crate::settings::{Accent, MascotSize};
@@ -60,6 +64,9 @@ const DEBOUNCE: Duration = Duration::from_millis(350);
 /// How long the header says what just happened before it goes back to the
 /// status.
 const NOTICE: Duration = Duration::from_millis(2600);
+/// How long a translation stays on screen before the history keeps it:
+/// longer than a pause between two words, shorter than reading it.
+const STAYED: Duration = Duration::from_millis(1500);
 
 pub enum PanelEvent {
     /// A translation started.
@@ -70,6 +77,9 @@ pub enum PanelEvent {
     Cleared,
     /// The result went to the clipboard.
     Copied,
+    /// A translation for the history: it stayed on screen, or it was copied.
+    /// It comes again, longer, when the user goes on with the same text.
+    Kept(Entry),
     HideRequested,
     /// The languages, the English variant or the model changed.
     PreferencesChanged,
@@ -126,6 +136,12 @@ pub struct Panel {
     /// the engine to stop.
     job: Option<Task<()>>,
     copied: bool,
+    /// The finished translation that is on screen, as the history keeps it.
+    finished: Option<Entry>,
+    /// True until the history is given `finished`.
+    unkept: bool,
+    /// Gives `finished` to the history when it has stayed long enough.
+    keeping: Option<Task<()>>,
     notice: Option<Notice>,
     translator: Translator,
     face: Frame,
@@ -186,6 +202,9 @@ impl Panel {
             debounce: None,
             job: None,
             copied: false,
+            finished: None,
+            unkept: false,
+            keeping: None,
             notice: None,
             translator,
             face: Mascot::new(Mood::Idle).frame(),
@@ -259,8 +278,10 @@ impl Panel {
     }
 
     fn on_typed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        // The text changed: what is being translated is already out of date.
+        // The text changed: what is being translated is already out of date,
+        // and the translation on screen is not staying.
         self.job = None;
+        self.keeping = None;
         self.phase = Phase::Typing;
         self.debounce = Some(cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(DEBOUNCE).await;
@@ -271,6 +292,9 @@ impl Panel {
 
     fn translate_now(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.debounce = None;
+        // Another translation is coming: the history gets that one.
+        self.finished = None;
+        self.keeping = None;
         let text = self.source_text(cx);
         if text.trim().is_empty() {
             self.job = None;
@@ -327,6 +351,7 @@ impl Panel {
                 self.phase = Phase::Translating { done, total };
             }
             Update::Done { text, elapsed, .. } => {
+                self.finish(&text, elapsed, cx);
                 self.show_result(text, window, cx);
                 self.phase = Phase::Done { elapsed };
                 cx.emit(PanelEvent::Translated);
@@ -339,6 +364,44 @@ impl Panel {
             }
         }
         cx.notify();
+    }
+
+    /// Notes a translation for the history, which gets it if it stays.
+    fn finish(&mut self, translation: &str, elapsed: Duration, cx: &mut Context<Self>) {
+        self.finished = Some(Entry {
+            at: history::now(),
+            from: self.direction.from,
+            to: self.direction.to,
+            detected: self.detect && !self.direction_pinned,
+            british: self.english == EnglishVariant::British,
+            accurate: self.quality == Quality::Accurate,
+            source: self.source_text(cx),
+            translation: translation.to_string(),
+            ms: elapsed.as_millis() as u64,
+            copied: false,
+        });
+        self.unkept = true;
+        self.keeping = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(STAYED).await;
+            this.update(cx, |this, cx| this.keep(cx)).ok();
+        }));
+    }
+
+    /// The translation on screen, when the history does not have it yet:
+    /// after this call it is the caller's to record. For the moments that
+    /// cannot wait for it to stay: the panel closes, the app quits.
+    pub fn take_unkept(&mut self) -> Option<Entry> {
+        self.keeping = None;
+        if !std::mem::take(&mut self.unkept) {
+            return None;
+        }
+        self.finished.clone()
+    }
+
+    fn keep(&mut self, cx: &mut Context<Self>) {
+        if let Some(entry) = self.take_unkept() {
+            cx.emit(PanelEvent::Kept(entry));
+        }
     }
 
     /// Puts a translation in the result card without moving what the user
@@ -445,6 +508,12 @@ impl Panel {
         }
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         self.copied = true;
+        // Worth keeping at once, and again if the history had it already.
+        if let Some(entry) = &mut self.finished {
+            entry.copied = true;
+            self.unkept = true;
+        }
+        self.keep(cx);
         cx.emit(PanelEvent::Copied);
         cx.notify();
         cx.spawn(async move |this, cx| {
@@ -563,7 +632,7 @@ impl Render for Panel {
         let has_result = self.result.read(cx).text().len() > 0;
         let words = self.source_text(cx).split_whitespace().count();
 
-        // ---- header: grip, name, status -------------------------------------
+        // ---- header: grip, name, status, close ------------------------------
         let dot_color = match dot {
             StatusDot::Quiet => p.muted,
             StatusDot::Busy => p.primary,
@@ -575,7 +644,9 @@ impl Render for Panel {
             .items_center()
             .justify_between()
             .h(px(46.))
-            .px(px(18.))
+            .pl(px(18.))
+            // The cross is over the arrows of the card below.
+            .pr(px(12.))
             // The panel has no title bar: the header moves it.
             .on_mouse_down(MouseButton::Left, |_, window, _| window.start_window_move())
             .child(
@@ -592,7 +663,8 @@ impl Render for Panel {
                     .items_center()
                     .gap(px(9.))
                     .child(div().text_size(px(13.5)).text_color(p.ink.opacity(0.72)).child(status))
-                    .child(div().size(px(8.)).rounded_full().bg(dot_color)),
+                    .child(div().size(px(8.)).rounded_full().bg(dot_color))
+                    .child(theme::close(&p).ml(px(3.)).on_click(cx.listener(|_, _, _, cx| cx.emit(PanelEvent::HideRequested)))),
             );
 
         // ---- the line under the header ----------------------------------------
@@ -724,7 +796,7 @@ impl Render for Panel {
             // As much room under the words as the language takes above them.
             .when(!has_result, |card| card.child(div().flex_1().min_h_0().pb(px(40.)).child(empty)));
 
-        // ---- footer card: English variant, options, numbers, actions -----------------------
+        // ---- footer card: English variant, options, numbers, copy --------------------------
         let english_tab = |label: &'static str, variant: EnglishVariant, this: &Self| {
             let active = this.english == variant;
             div()
@@ -842,24 +914,12 @@ impl Render for Panel {
                             .child(div().font_family(MONO).text_size(px(12.5)).text_color(p.muted).child(numbers)),
                     )
                     .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(8.))
-                            .child(
-                                chip("copy", &p)
-                                    .px(px(14.))
-                                    .when(!has_result, |chip| chip.opacity(0.45))
-                                    .on_click(cx.listener(|this, _, _, cx| this.copy(cx)))
-                                    .child(Icon::new(if self.copied { IconName::Check } else { IconName::Copy }).size(px(14.)))
-                                    .child(if self.copied { "Copied" } else { "Copy" }),
-                            )
-                            .child(
-                                chip("close", &p)
-                                    .w(px(32.))
-                                    .on_click(cx.listener(|_, _, _, cx| cx.emit(PanelEvent::HideRequested)))
-                                    .child(Icon::new(IconName::X).size(px(14.))),
-                            ),
+                        chip("copy", &p)
+                            .px(px(14.))
+                            .when(!has_result, |chip| chip.opacity(0.45))
+                            .on_click(cx.listener(|this, _, _, cx| this.copy(cx)))
+                            .child(Icon::new(if self.copied { IconName::Check } else { IconName::Copy }).size(px(14.)))
+                            .child(if self.copied { "Copied" } else { "Copy" }),
                     ),
             );
 
@@ -867,6 +927,8 @@ impl Render for Panel {
             .id("traduko-panel")
             .key_context(KEY_CONTEXT)
             .track_focus(&self.focus)
+            // A press on the shell is not one on what is around it.
+            .occlude()
             .on_action(cx.listener(|this, _: &Translate, window, cx| this.translate_now(window, cx)))
             .on_action(cx.listener(|_, _: &HidePanel, _, cx| cx.emit(PanelEvent::HideRequested)))
             .on_action(cx.listener(|this, _: &SwapDirection, window, cx| this.swap(window, cx)))
@@ -896,6 +958,15 @@ impl Render for Panel {
             .child(line)
             .child(div().flex().flex_col().gap(px(8.)).child(source).child(result).child(footer));
 
-        div().size_full().flex().items_center().justify_center().child(shell)
+        // The window is larger than the shell, for the shadow: a press there
+        // is a press outside the panel, which closes it like one anywhere
+        // else on the screen.
+        div()
+            .size_full()
+            .flex()
+            .items_center()
+            .justify_center()
+            .on_any_mouse_down(cx.listener(|_, _, _, cx| cx.emit(PanelEvent::HideRequested)))
+            .child(shell)
     }
 }
