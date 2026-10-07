@@ -32,12 +32,40 @@ impl MascotSize {
     }
 }
 
+/// The colour of Traduko, and of what stands out in its windows. The colours
+/// themselves are in `theme`.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Accent {
+    #[default]
+    Orange,
+    Pink,
+    Violet,
+    Blue,
+    Teal,
+}
+
+impl Accent {
+    pub const ALL: [Accent; 5] = [Accent::Orange, Accent::Pink, Accent::Violet, Accent::Blue, Accent::Teal];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Accent::Orange => "Orange",
+            Accent::Pink => "Pink",
+            Accent::Violet => "Violet",
+            Accent::Blue => "Blue",
+            Accent::Teal => "Teal",
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
 pub struct Settings {
     /// Bottom-left corner of the mascot window, in screen points.
     pub mascot: Option<(f64, f64)>,
     pub mascot_size: MascotSize,
+    pub accent: Accent,
     /// The languages of the last translation.
     pub from: Language,
     pub to: Language,
@@ -59,6 +87,7 @@ impl Default for Settings {
         Self {
             mascot: None,
             mascot_size: MascotSize::default(),
+            accent: Accent::default(),
             from: Language::FRENCH,
             to: Language::ENGLISH,
             detect_language: true,
@@ -128,6 +157,7 @@ mod tests {
         let settings = Settings {
             mascot: Some((120.0, 48.5)),
             mascot_size: MascotSize::Large,
+            accent: Accent::Violet,
             from: Language::from_code("de").unwrap(),
             to: Language::FRENCH,
             detect_language: false,
@@ -157,6 +187,7 @@ mod tests {
         std::fs::write(dir.join(FILE), br#"{ "british": true, "accurate": false }"#).unwrap();
         let settings = Settings::load(&dir);
         assert_eq!(settings.mascot_size, MascotSize::Medium);
+        assert_eq!(settings.accent, Accent::Orange);
         assert!(settings.british);
         // Nor did it see the first screens: they are shown once.
         assert!(!settings.onboarded);
@@ -180,6 +211,12 @@ mod tests {
     fn the_languages_are_saved_as_their_codes() {
         let saved = serde_json::to_value(Settings::default()).unwrap();
         assert_eq!((saved["from"].as_str(), saved["to"].as_str()), (Some("fr"), Some("en")));
+    }
+
+    #[test]
+    fn the_colour_is_saved_as_its_name() {
+        let saved = serde_json::to_value(Settings { accent: Accent::Teal, ..Settings::default() }).unwrap();
+        assert_eq!(saved["accent"].as_str(), Some("teal"));
     }
 
     #[test]

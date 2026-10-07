@@ -25,7 +25,7 @@ use traduko_engine::{Direction, EnglishVariant, Installed, Language, Quality, Re
 
 use crate::detect;
 use crate::mascot_view;
-use crate::settings::MascotSize;
+use crate::settings::{Accent, MascotSize};
 use crate::theme::{self, MONO, SHELL_PAD, SHELL_RADIUS, card, chip, grip, micro};
 
 actions!(
@@ -69,6 +69,7 @@ pub enum PanelEvent {
     /// The languages, the English variant or the model changed.
     PreferencesChanged,
     MascotSizeChanged(MascotSize),
+    AccentChanged(Accent),
     OpenAtLoginChanged(bool),
     /// The user wants to download a model.
     ModelsRequested,
@@ -397,6 +398,13 @@ impl Panel {
         }
     }
 
+    /// The colour is the theme's to keep: the panel only asks for another.
+    fn set_accent(&mut self, accent: Accent, cx: &mut Context<Self>) {
+        if theme::palette(cx).accent != accent {
+            cx.emit(PanelEvent::AccentChanged(accent));
+        }
+    }
+
     fn copy(&mut self, cx: &mut Context<Self>) {
         let text = self.result_text(cx);
         if text.is_empty() {
@@ -499,6 +507,18 @@ fn language_item(
     })
 }
 
+/// A line of the menu of colours: the colour itself, then its name.
+fn accent_item(accent: Accent, checked: bool, panel: &WeakEntity<Panel>) -> PopupMenuItem {
+    let panel = panel.clone();
+    PopupMenuItem::element(move |_, _| {
+        div().flex().flex_1().items_center().gap(px(8.)).child(div().size(px(10.)).rounded_full().bg(accent.swatch())).child(accent.name())
+    })
+    .checked(checked)
+    .on_click(move |_, _, cx| {
+        panel.update(cx, |panel, cx| panel.set_accent(accent, cx)).ok();
+    })
+}
+
 impl Render for Panel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = theme::palette(cx);
@@ -555,6 +575,7 @@ impl Render for Panel {
 
         // ---- the two languages, each a menu ------------------------------------------
         let (languages, detect, panel) = (self.languages(), self.detect, cx.entity().downgrade());
+        let colors = panel.clone();
         let more = |menu: PopupMenu, panel: &WeakEntity<Self>| {
             menu.separator().item(language_item("More languages…", false, panel, |_, _, cx| cx.emit(PanelEvent::LanguagesRequested)))
         };
@@ -629,7 +650,7 @@ impl Render for Panel {
             Phase::Translating { .. } => ("On it", "Reading your text".into()),
             _ => ("Ready when you are", "Type above, I translate as you go".into()),
         };
-        let face = self.face.clone();
+        let face = Frame { color: p.accent.body(), ..self.face.clone() };
         let empty = div()
             .flex()
             .items_center()
@@ -705,7 +726,7 @@ impl Render for Panel {
         };
 
         let (quality, installed, open_at_login) = (self.quality, self.installed.qualities(), self.open_at_login);
-        let mascot_size = self.mascot_size;
+        let (mascot_size, accent) = (self.mascot_size, p.accent);
         let focus = self.focus.clone();
         let options = Button::new("options")
             .ghost()
@@ -716,7 +737,7 @@ impl Render for Panel {
             })
             .dropdown_caret(true)
             // Upwards and right-aligned, so that it stays inside the shell.
-            .dropdown_menu_with_anchor(gpui::Anchor::BottomRight, move |menu, _, _| {
+            .dropdown_menu_with_anchor(gpui::Anchor::BottomRight, move |menu, window, cx| {
                 let mut menu = menu.action_context(focus.clone()).min_w(px(220.)).label("Model");
                 if installed.contains(&Quality::Light) {
                     menu = menu.menu_with_check("Light · opus-mt", quality == Quality::Light, Box::new(UseLight));
@@ -724,6 +745,9 @@ impl Render for Panel {
                 if installed.contains(&Quality::Accurate) {
                     menu = menu.menu_with_check("Accurate · opus-mt-tc-big", quality == Quality::Accurate, Box::new(UseAccurate));
                 }
+                // The colours are a menu of their own: listed here, they
+                // would push this one out of the top of the shell.
+                let colors = colors.clone();
                 menu.menu("Download models…", Box::new(ShowModels))
                     .separator()
                     .label("Mascot size")
@@ -731,6 +755,9 @@ impl Render for Panel {
                     .menu_with_check("Medium", mascot_size == MascotSize::Medium, Box::new(MascotMedium))
                     .menu_with_check("Large", mascot_size == MascotSize::Large, Box::new(MascotLarge))
                     .separator()
+                    .submenu("Color", window, cx, move |menu, _, _| {
+                        Accent::ALL.into_iter().fold(menu, |menu, choice| menu.item(accent_item(choice, choice == accent, &colors)))
+                    })
                     .menu_with_check("Open at login", open_at_login, Box::new(ToggleOpenAtLogin))
                     .separator()
                     .menu("Quit Traduko", Box::new(QuitTraduko))

@@ -177,7 +177,7 @@ impl Onboarding {
         // take the other.
         let sets = [Pack::Set(Quality::Accurate), Pack::Set(Quality::Light)];
         let models = sets.into_iter().chain(languages().into_iter().map(Pack::Language)).map(model).collect();
-        let mut mascot = Mascot::new(Mood::Idle);
+        let mut mascot = Mascot::new(Mood::Idle).tinted(theme::palette(cx).accent.body());
         mascot.enter();
 
         let mut this = Self {

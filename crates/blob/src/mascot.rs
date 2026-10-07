@@ -37,7 +37,8 @@ pub enum Mood {
 #[derive(Clone, Copy)]
 struct Look {
     shape: Shape,
-    color: Rgb,
+    /// `None` is Traduko's own colour, which can be chosen.
+    color: Option<Rgb>,
     eye_w: f32,
     eye_h: f32,
     /// Degrees, clockwise; 0 is an upright pill.
@@ -50,11 +51,11 @@ struct Look {
 impl Mood {
     fn look(self) -> Look {
         match self {
-            Mood::Idle => Look { shape: Shape::Bubble, color: ORANGE, eye_w: 0.17, eye_h: 0.46, eye_tilt: 7.0, eye_gap: 0.46, eye_x: 0.02, eye_y: -0.14 },
-            Mood::Thinking => Look { shape: Shape::Cloud, color: ORANGE, eye_w: 0.15, eye_h: 0.34, eye_tilt: -68.0, eye_gap: 0.42, eye_x: 0.04, eye_y: -0.20 },
-            Mood::Happy => Look { shape: Shape::Capsule, color: ORANGE, eye_w: 0.25, eye_h: 0.50, eye_tilt: 0.0, eye_gap: 0.58, eye_x: 0.0, eye_y: -0.10 },
-            Mood::Sorry => Look { shape: Shape::Drop, color: GRAY, eye_w: 0.15, eye_h: 0.40, eye_tilt: 9.0, eye_gap: 0.40, eye_x: -0.04, eye_y: 0.08 },
-            Mood::Waking => Look { shape: Shape::Ball, color: INK, eye_w: 0.12, eye_h: 0.32, eye_tilt: 24.0, eye_gap: 0.40, eye_x: -0.18, eye_y: -0.30 },
+            Mood::Idle => Look { shape: Shape::Bubble, color: None, eye_w: 0.17, eye_h: 0.46, eye_tilt: 7.0, eye_gap: 0.46, eye_x: 0.02, eye_y: -0.14 },
+            Mood::Thinking => Look { shape: Shape::Cloud, color: None, eye_w: 0.15, eye_h: 0.34, eye_tilt: -68.0, eye_gap: 0.42, eye_x: 0.04, eye_y: -0.20 },
+            Mood::Happy => Look { shape: Shape::Capsule, color: None, eye_w: 0.25, eye_h: 0.50, eye_tilt: 0.0, eye_gap: 0.58, eye_x: 0.0, eye_y: -0.10 },
+            Mood::Sorry => Look { shape: Shape::Drop, color: Some(GRAY), eye_w: 0.15, eye_h: 0.40, eye_tilt: 9.0, eye_gap: 0.40, eye_x: -0.04, eye_y: 0.08 },
+            Mood::Waking => Look { shape: Shape::Ball, color: Some(INK), eye_w: 0.12, eye_h: 0.32, eye_tilt: 24.0, eye_gap: 0.40, eye_x: -0.18, eye_y: -0.30 },
         }
     }
 }
@@ -86,6 +87,8 @@ pub struct Mascot {
     from: Radii,
     to: Radii,
     morph: Spring,
+    /// The colour of the moods that have none of their own.
+    own: Rgb,
     color_from: Rgb,
     color_to: Rgb,
     color_t: f32,
@@ -144,6 +147,7 @@ impl Mascot {
     pub fn new(mood: Mood) -> Self {
         let look = mood.look();
         let radii = *look.shape.radii();
+        let color = look.color.unwrap_or(ORANGE);
         Self {
             clock: 0.0,
             seed: 0x2545_F491,
@@ -151,8 +155,9 @@ impl Mascot {
             from: radii,
             to: radii,
             morph: Spring::new(1.0, 2.6, 0.52),
-            color_from: look.color,
-            color_to: look.color,
+            own: ORANGE,
+            color_from: color,
+            color_to: color,
             color_t: 1.0,
             stretch: Spring::new(1.0, 3.4, 0.32),
             lean: Spring::new(0.0, 2.8, 0.45),
@@ -191,6 +196,28 @@ impl Mascot {
         self.mood
     }
 
+    /// A Traduko that is `own` from the start instead of orange.
+    pub fn tinted(mut self, own: Rgb) -> Self {
+        self.own = own;
+        let color = self.mood.look().color.unwrap_or(own);
+        (self.color_from, self.color_to, self.color_t) = (color, color, 1.0);
+        self
+    }
+
+    /// Changes Traduko's own colour, the one of every mood that has none of its
+    /// own. It fades in, like the colour of a new mood.
+    pub fn set_color(&mut self, own: Rgb) {
+        if own == self.own {
+            return;
+        }
+        self.own = own;
+        if self.mood.look().color.is_none() {
+            self.color_from = self.color();
+            self.color_to = own;
+            self.color_t = 0.0;
+        }
+    }
+
     /// Changes shape, colour and eyes. The body morphs from wherever it is
     /// now, so a change in the middle of another one stays smooth.
     pub fn set_mood(&mut self, mood: Mood) {
@@ -203,7 +230,7 @@ impl Mascot {
         self.morph.x = 0.0;
         self.morph.target = 1.0;
         self.color_from = self.color();
-        self.color_to = look.color;
+        self.color_to = look.color.unwrap_or(self.own);
         self.color_t = 0.0;
         self.eye_w.target = look.eye_w;
         self.eye_h.target = look.eye_h;
@@ -778,5 +805,32 @@ mod tests {
             }
         }
         assert!(worst < 1.42, "the body reaches {worst}, outside the canvas");
+    }
+
+    #[test]
+    fn a_new_colour_fades_in_and_comes_back_after_a_mood_with_its_own() {
+        const BLUE: Rgb = [0.169, 0.482, 0.941];
+        // The blend of two colours ends a rounding error away from the second.
+        let is = |m: &Mascot, color: Rgb| m.color().iter().zip(color).all(|(a, b)| (a - b).abs() < 1e-5);
+        let mut m = Mascot::default();
+        assert!(is(&m, ORANGE));
+        m.set_color(BLUE);
+        assert!(is(&m, ORANGE), "the colour jumps instead of fading");
+        assert!(!m.is_resting());
+        run(&mut m, 0.5);
+        assert!(is(&m, BLUE));
+
+        m.set_mood(Mood::Sorry);
+        run(&mut m, 0.5);
+        assert!(is(&m, GRAY));
+        // Chosen while Traduko is gray: it shows once Traduko is itself again.
+        m.set_color(ORANGE);
+        assert!(is(&m, GRAY));
+        m.set_mood(Mood::Idle);
+        run(&mut m, 0.5);
+        assert!(is(&m, ORANGE));
+
+        assert!(is(&Mascot::new(Mood::Idle).tinted(BLUE), BLUE));
+        assert!(is(&Mascot::new(Mood::Waking).tinted(BLUE), INK));
     }
 }

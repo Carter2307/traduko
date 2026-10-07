@@ -65,7 +65,7 @@ scripts/uninstall.sh
 | The language over the bottom card | Choose the language to translate to |
 | The arrows in the top card, or ⌘⇧S | Swap the languages |
 | American / British | Choose the English you want, when translating to English |
-| Light / Accurate | Choose the model and Traduko's size (small, medium, large), download the other model, open at login, quit |
+| Light / Accurate | Choose the model, Traduko's size (small, medium, large) and its colour (orange, pink, violet, blue, teal), download the other model, open at login, quit |
 | ⌘⇧C, or Copy | Copy the translation |
 | Esc, or × | Close the panel |
 

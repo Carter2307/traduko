@@ -54,11 +54,12 @@ impl Traduko {
     /// Opens the mascot and starts everything behind it.
     pub fn start(support: PathBuf, cx: &mut App) -> anyhow::Result<Entity<Self>> {
         let settings = Settings::load(&support);
+        crate::theme::set_accent(settings.accent, cx);
         let models = settings::models_dir();
         let installed = Translator::installed(&models);
         let translator = Translator::start(models.clone());
 
-        let (mascot_handle, mascot) = mascot_view::open(cx, settings.mascot, Mood::Idle, settings.mascot_size.side())?;
+        let (mascot_handle, mascot) = mascot_view::open(cx, settings.mascot, Mood::Idle, settings.mascot_size.side(), settings.accent.body())?;
         let mascot_window = mascot_handle
             .update(cx, |_, window, _| native::ns_window(window))?
             .ok_or_else(|| anyhow::anyhow!("the mascot has no native window"))?;
@@ -438,6 +439,13 @@ impl Traduko {
                 // The mascot reports its new place once resized: that saves
                 // it and moves the panel beside it.
                 self.mascot.update(cx, |mascot, cx| mascot.set_side(side, cx));
+            }
+            PanelEvent::AccentChanged(accent) => {
+                self.settings.accent = *accent;
+                self.save();
+                crate::theme::set_accent(*accent, cx);
+                let body = accent.body();
+                self.mascot.update(cx, |mascot, cx| mascot.set_color(body, cx));
             }
             PanelEvent::OpenAtLoginChanged(on) => {
                 let on = *on;

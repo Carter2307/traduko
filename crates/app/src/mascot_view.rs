@@ -9,7 +9,7 @@ use gpui::{
     WindowBackgroundAppearance, WindowBounds, WindowHandle, WindowKind, WindowOptions, canvas, div,
     point, prelude::*, px, size,
 };
-use traduko_blob::{CANVAS, Frame, Mascot, Mood};
+use traduko_blob::{CANVAS, Frame, Mascot, Mood, Rgb};
 
 use objc2::rc::Retained;
 use objc2_app_kit::NSWindow;
@@ -61,8 +61,8 @@ pub struct MascotView {
 impl EventEmitter<MascotEvent> for MascotView {}
 
 impl MascotView {
-    fn new(mood: Mood, side: f32, cx: &mut Context<Self>) -> Self {
-        let mut mascot = Mascot::new(mood);
+    fn new(mood: Mood, side: f32, color: Rgb, cx: &mut Context<Self>) -> Self {
+        let mut mascot = Mascot::new(mood).tinted(color);
         mascot.enter();
 
         // A still Traduko draws nothing, so nothing tells it that the pointer
@@ -138,6 +138,12 @@ impl MascotView {
 
     pub fn set_mood(&mut self, mood: Mood, cx: &mut Context<Self>) {
         self.mascot.set_mood(mood);
+        cx.notify();
+    }
+
+    /// Changes the colour of the body, which fades to it.
+    pub fn set_color(&mut self, color: Rgb, cx: &mut Context<Self>) {
+        self.mascot.set_color(color);
         cx.notify();
     }
 
@@ -415,6 +421,7 @@ pub fn open(
     origin: Option<(f64, f64)>,
     mood: Mood,
     side: f32,
+    color: Rgb,
 ) -> anyhow::Result<(WindowHandle<MascotView>, Entity<MascotView>)> {
     let points = side;
     let side = px(points);
@@ -439,7 +446,7 @@ pub fn open(
         },
         |window, cx| {
             native::float(window, Floating::Mascot);
-            let mascot = cx.new(|cx| MascotView::new(mood, points, cx));
+            let mascot = cx.new(|cx| MascotView::new(mood, points, color, cx));
             view = Some(mascot.clone());
             mascot
         },

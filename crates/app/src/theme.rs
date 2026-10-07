@@ -9,6 +9,8 @@ use gpui::{
 };
 use gpui_component::{Theme, ThemeMode};
 
+use crate::settings::Accent;
+
 pub const SANS: &str = "Geist";
 pub const MONO: &str = "Geist Mono";
 
@@ -29,6 +31,8 @@ pub struct Palette {
     pub line: Hsla,
     pub chip: Hsla,
     pub chip_hover: Hsla,
+    /// The colour the user chose, and `primary` is what it gives here.
+    pub accent: Accent,
     pub primary: Hsla,
     pub ok: Hsla,
     pub shadow: Hsla,
@@ -36,8 +40,35 @@ pub struct Palette {
 
 impl Global for Palette {}
 
+impl Accent {
+    /// On the light cards, then on the dark ones, where it is lighter to
+    /// stand out as much. All of them carry white text, and none is the
+    /// green of `ok` or the gray of a Traduko that is sorry.
+    fn hex(self) -> (u32, u32) {
+        match self {
+            Accent::Orange => (0xf45a1c, 0xff6a2b),
+            Accent::Pink => (0xe8408a, 0xff5fa2),
+            Accent::Violet => (0x7b52ee, 0x9d7dff),
+            Accent::Blue => (0x2b7bf0, 0x4f97ff),
+            Accent::Teal => (0x0b959b, 0x1aa9b0),
+        }
+    }
+
+    /// The body of the mascot. The same on light and dark: Traduko is on the
+    /// desktop, whatever the windows look like.
+    pub fn body(self) -> traduko_blob::Rgb {
+        let hex = self.hex().0;
+        [16, 8, 0].map(|shift| ((hex >> shift) & 0xff) as f32 / 255.0)
+    }
+
+    /// As a swatch, in a menu of either appearance.
+    pub fn swatch(self) -> Hsla {
+        rgb(self.hex().0).into()
+    }
+}
+
 impl Palette {
-    fn light() -> Self {
+    fn light(accent: Accent) -> Self {
         Self {
             shell: rgb(0xf2f2f2).into(),
             card: rgb(0xffffff).into(),
@@ -47,13 +78,14 @@ impl Palette {
             line: rgb(0xe4e4e6).into(),
             chip: rgb(0xf2f2f3).into(),
             chip_hover: rgb(0xe8e8ea).into(),
-            primary: rgb(0xf45a1c).into(),
+            accent,
+            primary: rgb(accent.hex().0).into(),
             ok: rgb(0x1fb46a).into(),
             shadow: rgba(0x00000026).into(),
         }
     }
 
-    fn dark() -> Self {
+    fn dark(accent: Accent) -> Self {
         Self {
             shell: rgb(0x1c1c1e).into(),
             card: rgb(0x28282a).into(),
@@ -62,7 +94,8 @@ impl Palette {
             line: rgb(0x38383b).into(),
             chip: rgb(0x343437).into(),
             chip_hover: rgb(0x404044).into(),
-            primary: rgb(0xff6a2b).into(),
+            accent,
+            primary: rgb(accent.hex().1).into(),
             ok: rgb(0x34c77b).into(),
             shadow: rgba(0x00000066).into(),
         }
@@ -137,12 +170,24 @@ pub fn register_fonts(cx: &mut App) {
 /// Follows the system: call at start-up and whenever the appearance changes.
 /// `TRADUKO_APPEARANCE=light|dark` forces one side, to capture both.
 pub fn apply(appearance: WindowAppearance, cx: &mut App) {
+    // The colour is the user's, not the system's: it stays.
+    let accent = cx.try_global::<Palette>().map(|palette| palette.accent).unwrap_or_default();
+    apply_with(appearance, accent, cx);
+}
+
+/// Changes the colour that stands out, in every window that is open.
+pub fn set_accent(accent: Accent, cx: &mut App) {
+    apply_with(cx.window_appearance(), accent, cx);
+    cx.refresh_windows();
+}
+
+fn apply_with(appearance: WindowAppearance, accent: Accent, cx: &mut App) {
     let mode = match std::env::var("TRADUKO_APPEARANCE").as_deref() {
         Ok("light") => ThemeMode::Light,
         Ok("dark") => ThemeMode::Dark,
         _ => ThemeMode::from(appearance),
     };
-    let palette = if mode.is_dark() { Palette::dark() } else { Palette::light() };
+    let palette = if mode.is_dark() { Palette::dark(accent) } else { Palette::light(accent) };
     cx.set_global(palette);
 
     // The text areas come from the component library and read its theme.
