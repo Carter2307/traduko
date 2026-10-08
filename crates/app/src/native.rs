@@ -1,5 +1,5 @@
 //! Raw AppKit calls for what gpui does not expose: window level, Spaces,
-//! shadow, moving and hiding a window, the clicks that go to other apps.
+//! shadow, glass, moving and hiding a window, the clicks that go to other apps.
 //!
 //! gpui hands out its NSView through `raw-window-handle`; the NSWindow is
 //! that view's window. Everything here runs on the main thread, which is
@@ -9,13 +9,14 @@ use std::ptr::NonNull;
 
 use block2::RcBlock;
 use objc2::rc::Retained;
-use objc2::runtime::AnyObject;
+use objc2::runtime::{AnyClass, AnyObject};
 use objc2::{MainThreadMarker, msg_send};
 use objc2_app_kit::{
-    NSAppearance, NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSApplication, NSEvent, NSEventMask, NSScreen, NSView,
-    NSWindow, NSWindowAnimationBehavior, NSWindowCollectionBehavior,
+    NSAppearance, NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSApplication, NSEvent, NSEventMask,
+    NSGlassEffectView, NSScreen, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
+    NSVisualEffectView, NSWindow, NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowOrderingMode,
 };
-use objc2_foundation::{NSPoint, NSRect};
+use objc2_foundation::{NSPoint, NSRect, NSSize};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 /// Above normal windows, below the menu bar and menus. gpui's pop-up kind
@@ -66,7 +67,36 @@ pub fn float(window: &gpui::Window, kind: Floating) {
     }
 }
 
-/// Forces light or dark on the whole app.
+/// Puts the glass of macOS under what gpui draws: what is behind the window
+/// shows through it, blurred. The glass is `margin` inside the window and its
+/// corners have `radius`, like the shell that is drawn on it.
+pub fn glass(window: &gpui::Window, margin: f64, radius: f64) {
+    let Some(mtm) = MainThreadMarker::new() else { return };
+    let Some(content) = ns_window(window).and_then(|win| win.contentView()) else { return };
+    let bounds = content.bounds();
+    let frame = NSRect::new(NSPoint::new(margin, margin), NSSize::new(bounds.size.width - 2.0 * margin, bounds.size.height - 2.0 * margin));
+    // Liquid Glass came with macOS 26. Before it, the blur of a menu.
+    let view: Retained<NSView> = if AnyClass::get(c"NSGlassEffectView").is_some() {
+        let glass = NSGlassEffectView::initWithFrame(mtm.alloc(), frame);
+        glass.setCornerRadius(radius);
+        Retained::into_super(glass)
+    } else {
+        let blur = NSVisualEffectView::initWithFrame(mtm.alloc(), frame);
+        blur.setMaterial(NSVisualEffectMaterial::Popover);
+        blur.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
+        // Traduko is never the active app for long: the blur must not fade.
+        blur.setState(NSVisualEffectState::Active);
+        blur.setWantsLayer(true);
+        if let Some(layer) = blur.layer() {
+            let _: () = unsafe { msg_send![&*layer, setCornerRadius: radius] };
+            let _: () = unsafe { msg_send![&*layer, setMasksToBounds: true] };
+        }
+        Retained::into_super(blur)
+    };
+    content.addSubview_positioned_relativeTo(&view, NSWindowOrderingMode::Below, None);
+}
+
+/// Forces light or dark on the whole app, glass included.
 pub fn set_appearance(dark: bool) {
     let Some(mtm) = MainThreadMarker::new() else { return };
     let name = unsafe { if dark { NSAppearanceNameDarkAqua } else { NSAppearanceNameAqua } };

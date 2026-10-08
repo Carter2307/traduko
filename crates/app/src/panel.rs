@@ -959,7 +959,6 @@ impl Render for Panel {
             .flex_col()
             .p(px(SHELL_PAD))
             .rounded(px(SHELL_RADIUS))
-            .bg(p.shell)
             .font_family(theme::SANS)
             .text_color(p.ink)
             .child(header)
