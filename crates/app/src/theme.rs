@@ -25,11 +25,13 @@ pub const SHELL_MARGIN: f32 = 36.0;
 
 #[derive(Clone, Copy)]
 pub struct Palette {
-    /// The shell is the glass of macOS (see `native::glass`), and the cards
-    /// let it show, like the chips and the lines on them. gpui adds up the
-    /// opacity of what it draws on a transparent window: anything else that
-    /// is see-through under a card would make the card opaque.
+    /// The shell is a fixed colour (`shell`), and the cards let it show a
+    /// little, like the chips and the lines on them. gpui adds up the opacity
+    /// of what it draws on a transparent window: anything else that is
+    /// see-through under a card would make the card opaque.
     pub card: Hsla,
+    /// The colour of the shell, the same wherever the windows are.
+    pub shell: Hsla,
     /// A menu opens over text: nothing shows through it.
     pub menu: Hsla,
     pub ink: Hsla,
@@ -75,7 +77,8 @@ impl Accent {
 impl Palette {
     fn light(accent: Accent) -> Self {
         Self {
-            card: rgba(0xffffffa8).into(),
+            card: rgba(0xfffffff0).into(),
+            shell: rgb(0xcccccc).into(),
             menu: rgb(0xffffff).into(),
             ink: rgb(0x121214).into(),
             // Dark enough for small text on the white cards (4.9 to 1).
@@ -92,6 +95,7 @@ impl Palette {
     fn dark(accent: Accent) -> Self {
         Self {
             card: rgba(0x242427a0).into(),
+            shell: rgb(0x3b3b3c).into(),
             menu: rgb(0x28282a).into(),
             ink: rgb(0xf4f4f5).into(),
             muted: rgb(0xa0a0a6).into(),
@@ -201,7 +205,7 @@ fn apply_with(appearance: WindowAppearance, accent: Accent, cx: &mut App) {
         Ok("dark") => Some(ThemeMode::Dark),
         _ => None,
     };
-    // The glass is the system's: it has to be told as well.
+    // The system's own controls follow the same appearance.
     if let Some(mode) = forced {
         crate::native::set_appearance(mode.is_dark());
     }

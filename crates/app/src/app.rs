@@ -337,7 +337,6 @@ impl Traduko {
             },
             |window, cx| {
                 native::float(window, Floating::Panel);
-                native::glass(window, SHELL_MARGIN as f64, crate::theme::SHELL_RADIUS as f64);
                 let onboarding = cx.new(|cx| Onboarding::new(options, cx));
                 view = Some(onboarding.clone());
                 cx.new(|cx| Root::new(onboarding, window, cx).bg(gpui::transparent_black()))
@@ -360,6 +359,8 @@ impl Traduko {
         // The view goes with its window, and a download in progress with
         // the view: what it had fetched stays on disk for the next one.
         cx.spawn(async move |_, cx| {
+            // Hidden without the fade before the window is removed.
+            native::hide(&onboarding.native);
             onboarding.handle.update(cx, |_, window, _| window.remove_window()).ok();
         })
         .detach();
@@ -470,7 +471,6 @@ impl Traduko {
             },
             |window, cx| {
                 native::float(window, Floating::Panel);
-                native::glass(window, panel::MARGIN as f64, crate::theme::SHELL_RADIUS as f64);
                 let panel = cx.new(|cx| Panel::new(translator, options, window, cx));
                 view = Some(panel.clone());
                 cx.new(|cx| Root::new(panel, window, cx).bg(gpui::transparent_black()))
