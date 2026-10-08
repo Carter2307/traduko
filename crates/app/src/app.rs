@@ -209,6 +209,10 @@ impl Traduko {
         // must run outside of any gpui update: a task does that.
         cx.spawn(async move |_, cx| {
             native::set_origin(&window, place.x, place.y);
+            // Ordered in before it is made key. Made key alone, a panel that was
+            // hidden when another app took the keyboard does not come back on a
+            // full-screen Space.
+            native::show(&window);
             if take_keyboard {
                 handle
                     .update(cx, |_, window, cx| {
@@ -216,8 +220,6 @@ impl Traduko {
                         view.update(cx, |panel, cx| panel.focus_source(window, cx));
                     })
                     .ok();
-            } else {
-                native::show(&window);
             }
         })
         .detach();
